@@ -2,7 +2,6 @@ import streamlit as st
 from utils.styling import inject_css
 from utils.database import init_db
 
-# --- NORMAL PAGE LOADING RESTORED ---
 def load_pages():
     import pages.home
     import pages.feed
@@ -16,18 +15,14 @@ def load_pages():
     import pages.settings
     import pages.edit_run
 
-
 def main():
     st.set_page_config(page_title="Run Tracker", layout="wide")
     inject_css()
     init_db()
-
-    # Load all pages normally
     load_pages()
 
     st.title("Run Tracker")
     st.write("Select a page from the sidebar.")
-
 
 if __name__ == "__main__":
     main()
