@@ -3,6 +3,7 @@ from openai import OpenAI
 
 
 def get_client():
+    # Uses the OPENAI_API_KEY stored in Streamlit secrets
     return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 
