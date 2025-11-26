@@ -15,6 +15,9 @@ def load_pages():
     import pages.pace_zones
     import pages.settings
     import pages.edit_run
+    import os
+print("FILES IN WORKING DIRECTORY:", os.listdir())
+print("FILES IN utils/:", os.listdir("utils"))
 
 
 def main():
