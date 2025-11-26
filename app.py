@@ -10,7 +10,7 @@ def load_pages():
     import pages.log_run
     import pages.dashboard
     import pages.garmin_import
-    import pages.ai_coach
+    #import pages.ai_coach
     import pages.compare_runs
     import pages.pace_zones
     import pages.settings
