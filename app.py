@@ -1,6 +1,13 @@
 import streamlit as st
 from utils.styling import inject_css
 from utils.database import init_db, fetch_runs
+import os   # ← required so os.listdir() works
+
+print("FILES IN WORKING DIRECTORY:", os.listdir())
+if os.path.exists("utils"):
+    print("FILES IN utils/:", os.listdir("utils"))
+else:
+    print("utils folder NOT FOUND!")
 
 # Import all pages
 def load_pages():
