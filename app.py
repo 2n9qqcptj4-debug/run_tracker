@@ -1,16 +1,18 @@
 # ======================================================
-# DEBUG OPENAI IMPORT — MUST BE THE FIRST THING IN FILE
+# DEBUG OPENAI IMPORT — MUST BE AT TOP OF FILE
 # ======================================================
-import openai
-import inspect
 import sys
 
-print(">>> DEBUGGING OPENAI IMPORT")
 print(">>> PYTHON PATH:", sys.path)
-print(">>> OPENAI MODULE:", openai)
-print(">>> OPENAI FILE:", openai.__file__)
-print(">>> OPENAI VERSION:", getattr(openai, "__version__", "NO VERSION"))
-print(">>> OPENAI ATTRIBUTES SAMPLE:", dir(openai)[:20])
+
+try:
+    import openai
+    print(">>> OPENAI MODULE:", openai)
+    print(">>> OPENAI FILE:", openai.__file__)
+    print(">>> OPENAI VERSION:", getattr(openai, "__version__", "NO VERSION FOUND"))
+    print(">>> OPENAI ATTRIBUTES SAMPLE:", dir(openai)[:25])
+except Exception as e:
+    print(">>> FAILED TO IMPORT OPENAI:", e)
 
 # ======================================================
 # END DEBUG BLOCK
@@ -26,7 +28,7 @@ from datetime import datetime, timedelta
 
 
 # ------------------------------------------------------
-# Load Pages (so Streamlit knows the multipage files)
+# MANUALLY LOAD PAGES (Streamlit multipage support)
 # ------------------------------------------------------
 def load_pages():
     import pages.feed
@@ -42,7 +44,7 @@ def load_pages():
 
 
 # ------------------------------------------------------
-# HOME PAGE UI
+# HOME PAGE (Beautiful dashboard-style landing page)
 # ------------------------------------------------------
 def render_home():
     st.title("🏃‍♂️ Run Tracker")
@@ -50,26 +52,26 @@ def render_home():
 
     df = fetch_runs()
 
-    # ---------------- Empty State ----------------
+    # ================ EMPTY STATE ================
     if df.empty:
         st.markdown(
             """
             ### 👋 Welcome!
-            Let's get your training journey started.
+            Start your running journey.
 
             **Next steps:**
             - 📝 Log your first run  
             - 📥 Import Garmin history  
-            - 🤖 Try the AI Coach  
+            - 🤖 Ask AI Coach for training guidance  
 
-            This homepage will automatically update with your stats.
+            Your dashboard will populate automatically once runs are logged.
             """
         )
         return
 
     metrics = prepare_metrics_df(df)
 
-    # ---------------- Last Run Card ----------------
+    # ================= LAST RUN CARD =================
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("🏃 Last Run")
 
@@ -91,7 +93,7 @@ def render_home():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---------------- Weekly Summary ----------------
+    # ================= WEEKLY SUMMARY =================
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("📅 Weekly Summary")
 
@@ -99,52 +101,51 @@ def render_home():
     last7 = df[week_mask]
 
     if last7.empty:
-        st.info("No runs logged in the last week.")
+        st.info("No runs logged in the last 7 days.")
     else:
-        miles = last7["distance"].sum()
-        count = len(last7)
+        total_miles = last7["distance"].sum()
+        runs_count = len(last7)
         avg_effort = last7["effort"].mean() if "effort" in last7 else None
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("Mileage (7 days)", f"{miles:.1f} mi")
-        c2.metric("Runs Logged", count)
+        c1.metric("Mileage (7 days)", f"{total_miles:.1f} mi")
+        c2.metric("Runs Logged", runs_count)
         if avg_effort:
             c3.metric("Avg Effort", f"{avg_effort:.1f}/10")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---------------- Quick Actions ----------------
+    # ================= QUICK ACTIONS =================
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("⚡ Quick Actions")
 
-    a1, a2, a3 = st.columns(3)
+    q1, q2, q3 = st.columns(3)
 
-    with a1:
+    with q1:
         if st.button("📝 Log a Run"):
-            st.session_state["page"] = "Log Run"
+            st.switch_page("pages/log_run.py")
 
-    with a2:
+    with q2:
         if st.button("🤖 AI Coach"):
-            st.session_state["page"] = "AI Coach"
+            st.switch_page("pages/ai_coach.py")
 
-    with a3:
+    with q3:
         if st.button("📆 Calendar"):
-            st.session_state["page"] = "Calendar"
+            st.switch_page("pages/calendar.py")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ------------------------------------------------------
-# MAIN APP
+# MAIN
 # ------------------------------------------------------
 def main():
     st.set_page_config(page_title="Run Tracker", layout="wide")
     inject_css()
     init_db()
+    load_pages()
 
-    load_pages()  # register Streamlit multipage files
-
-    # Render homepage
+    # Render custom home page
     render_home()
 
 
