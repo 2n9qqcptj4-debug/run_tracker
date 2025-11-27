@@ -2,11 +2,15 @@ import streamlit as st
 from utils.styling import inject_css
 from utils.database import init_db, fetch_runs
 from utils.metrics import prepare_metrics_df
-from datetime import datetime, timedelta
 import pandas as pd
+from datetime import datetime, timedelta
 
 
+# ------------------------------------------------------
+# Load Pages (ONLY needed if you manually control nav)
+# ------------------------------------------------------
 def load_pages():
+    # These imports register the pages so Streamlit knows they exist
     import pages.feed
     import pages.calendar
     import pages.log_run
@@ -19,13 +23,16 @@ def load_pages():
     import pages.edit_run
 
 
+# ------------------------------------------------------
+# Home Page
+# ------------------------------------------------------
 def render_home():
     st.title("🏃‍♂️ Run Tracker")
     st.caption("Your running summary, insights, and quick actions — all in one place.")
 
     df = fetch_runs()
 
-    # ================ Empty State ================
+    # ---------------- Empty State ----------------
     if df.empty:
         st.markdown(
             """
@@ -34,30 +41,30 @@ def render_home():
 
             **Next steps:**
             - 📝 Log your first run  
-            - 📥 Import your Garmin history  
-            - 🤖 Use AI Coach to plan your week  
+            - 📥 Import Garmin history  
+            - 🤖 Try the AI Coach  
 
-            This homepage will automatically fill with your stats.
+            This homepage will automatically update with your stats.
             """
         )
         return
 
     metrics = prepare_metrics_df(df)
 
-    # ================= Last Run Card =================
+    # ---------------- Last Run Card ----------------
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("🏃 Last Run")
 
     last = df.iloc[-1]
 
-    col1, col2 = st.columns(2)
+    c1, c2 = st.columns(2)
 
-    with col1:
+    with c1:
         st.write(f"**Date:** {last['date']}")
         st.write(f"**Type:** {last['run_type']}")
         st.write(f"**Distance:** {last['distance']} mi")
 
-    with col2:
+    with c2:
         st.write(f"**Duration:** {last['duration']}")
         if last.get("avg_pace"):
             st.write(f"**Pace:** {last['avg_pace']} /mi")
@@ -66,7 +73,7 @@ def render_home():
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ================= Weekly Summary Card =================
+    # ---------------- Weekly Summary ----------------
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("📅 Weekly Summary")
 
@@ -76,51 +83,50 @@ def render_home():
     if last7.empty:
         st.info("No runs logged in the last week.")
     else:
-        total_miles = last7["distance"].sum()
-        runs_count = len(last7)
+        miles = last7["distance"].sum()
+        count = len(last7)
         avg_effort = last7["effort"].mean() if "effort" in last7 else None
 
         c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric("Mileage (7 days)", f"{total_miles:.1f} mi")
-        with c2:
-            st.metric("Runs Logged", runs_count)
-        with c3:
-            if avg_effort:
-                st.metric("Avg Effort", f"{avg_effort:.1f}/10")
+        c1.metric("Mileage (7 days)", f"{miles:.1f} mi")
+        c2.metric("Runs Logged", count)
+        if avg_effort:
+            c3.metric("Avg Effort", f"{avg_effort:.1f}/10")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ================= Quick Actions =================
+    # ---------------- Quick Actions ----------------
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("⚡ Quick Actions")
 
     a1, a2, a3 = st.columns(3)
 
+    # These only work if we add custom nav later
     with a1:
         if st.button("📝 Log a Run"):
-            st.switch_page("pages/log_run.py")
+            st.session_state["page"] = "Log Run"
 
     with a2:
         if st.button("🤖 AI Coach"):
-            st.switch_page("pages/ai_coach.py")
+            st.session_state["page"] = "AI Coach"
 
     with a3:
         if st.button("📆 Calendar"):
-            st.switch_page("pages/calendar.py")
+            st.session_state["page"] = "Calendar"
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # OPTIONAL: Future stat cards or charts can go here.
 
-
+# ------------------------------------------------------
+# Main App
+# ------------------------------------------------------
 def main():
     st.set_page_config(page_title="Run Tracker", layout="wide")
     inject_css()
     init_db()
-    load_pages()
+    load_pages()  # Keep this for multipage stability
 
-    # Render our new gorgeous Home page
+    # ---------------- HOME AUTOMATICALLY RENDERS ----------------
     render_home()
 
 
