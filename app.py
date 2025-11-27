@@ -1,3 +1,22 @@
+# ======================================================
+# DEBUG OPENAI IMPORT — MUST BE THE FIRST THING IN FILE
+# ======================================================
+import openai
+import inspect
+import sys
+
+print(">>> DEBUGGING OPENAI IMPORT")
+print(">>> PYTHON PATH:", sys.path)
+print(">>> OPENAI MODULE:", openai)
+print(">>> OPENAI FILE:", openai.__file__)
+print(">>> OPENAI VERSION:", getattr(openai, "__version__", "NO VERSION"))
+print(">>> OPENAI ATTRIBUTES SAMPLE:", dir(openai)[:20])
+
+# ======================================================
+# END DEBUG BLOCK
+# ======================================================
+
+
 import streamlit as st
 from utils.styling import inject_css
 from utils.database import init_db, fetch_runs
@@ -5,16 +24,11 @@ from utils.metrics import prepare_metrics_df
 import pandas as pd
 from datetime import datetime, timedelta
 
-print(">>> OPENAI MODULE FILE:", openai.__file__)
-print(">>> OPENAI VERSION:", getattr(openai, "__version__", "NO VERSION"))
-print(">>> OPENAI ATTRIBUTES SAMPLE:", [attr for attr in dir(openai)[:20]])
-
 
 # ------------------------------------------------------
-# Load Pages (ONLY needed if you manually control nav)
+# Load Pages (so Streamlit knows the multipage files)
 # ------------------------------------------------------
 def load_pages():
-    # These imports register the pages so Streamlit knows they exist
     import pages.feed
     import pages.calendar
     import pages.log_run
@@ -28,7 +42,7 @@ def load_pages():
 
 
 # ------------------------------------------------------
-# Home Page
+# HOME PAGE UI
 # ------------------------------------------------------
 def render_home():
     st.title("🏃‍♂️ Run Tracker")
@@ -105,7 +119,6 @@ def render_home():
 
     a1, a2, a3 = st.columns(3)
 
-    # These only work if we add custom nav later
     with a1:
         if st.button("📝 Log a Run"):
             st.session_state["page"] = "Log Run"
@@ -122,15 +135,16 @@ def render_home():
 
 
 # ------------------------------------------------------
-# Main App
+# MAIN APP
 # ------------------------------------------------------
 def main():
     st.set_page_config(page_title="Run Tracker", layout="wide")
     inject_css()
     init_db()
-    load_pages()  # Keep this for multipage stability
 
-    # ---------------- HOME AUTOMATICALLY RENDERS ----------------
+    load_pages()  # register Streamlit multipage files
+
+    # Render homepage
     render_home()
 
 
