@@ -403,28 +403,77 @@ PRs:
         st.markdown('<div class="section-header">📦 Training Block Generator</div>', unsafe_allow_html=True)
         st.markdown('<div class="card">', unsafe_allow_html=True)
 
-        block_race = st.selectbox("Race Type", [
-            "5K","10K","Half Marathon","Marathon","50K","50 Mile","100K","100 Mile"
-        ], index=2, key="tb_race")
+        # Race Type
+        block_race = st.selectbox(
+            "Race Type",
+            ["5K","10K","Half Marathon","Marathon","50K","50 Mile","100K","100 Mile"],
+            index=2,
+            key="tb_race"
+        )
 
+        # Goal Mode
         goal_mode = st.radio("Goal Mode", ["Finish","Specific Time"], key="tb_goal_mode")
-        goal_time = st.text_input("Target Time (HH:MM:SS)", key="tb_goal_time") if goal_mode == "Specific Time" else None
+        goal_time = st.text_input("Target Time (HH:MM:SS)", key="tb_goal_time") \
+            if goal_mode == "Specific Time" else None
 
-        block_weeks = st.slider("Block Length (weeks)", 4, 28, 12, key="tb_weeks")
-        taper = st.selectbox("Taper Length", ["1 week","10 days","2 weeks","3 weeks"], key="tb_taper")
+        # 🗓️ Race Date Input (NEW)
+        st.markdown("### 🗓️ Race Date")
+        race_date_block = st.date_input(
+            "Select your race date:",
+            value=datetime.today().date() + timedelta(weeks=12),
+            key="tb_race_date"
+        )
 
+        # Calculate weeks automatically (NEW)
+        today = datetime.today().date()
+        weeks_until_race = max(1, (race_date_block - today).days // 7)
+
+        st.markdown(
+            f"**Time until race:** `{weeks_until_race}` weeks (automatically calculated)"
+        )
+
+        # Optional override (NEW)
+        auto_override = st.checkbox(
+            "Override training block length?",
+            value=False,
+            key="tb_override"
+        )
+
+        if auto_override:
+            block_weeks = st.slider(
+                "Training Block Length (weeks)",
+                min_value=4,
+                max_value=28,
+                value=weeks_until_race,
+                key="tb_weeks"
+            )
+        else:
+            block_weeks = weeks_until_race
+
+        # Taper
+        taper = st.selectbox(
+            "Taper Length",
+            ["1 week","10 days","2 weeks","3 weeks"],
+            key="tb_taper"
+        )
+
+        # Schedule prefs
         days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
         train_days = st.multiselect("Training Days", days, default=["Mon","Tue","Thu","Sat","Sun"], key="tb_days")
         hard_days = st.multiselect("Hard Days", days, default=["Tue","Thu"], key="tb_hard")
         rest_days = st.multiselect("Rest Days", days, default=["Fri"], key="tb_rest")
         long_day = st.selectbox("Long Run Day", days, index=6, key="tb_long")
 
+        # Generate training block
         if st.button("📦 Generate Training Block", key="btn_tb"):
             with st.spinner("Building your custom training block…"):
                 result = call_ai(f"""
-Build a {block_weeks}-week training block.
+Build a structured {block_weeks}-week training block.
 
 Race: {block_race}
+Race date: {race_date_block}
+Weeks until race: {block_weeks}
+
 Goal: {goal_mode}
 Target time: {goal_time}
 
