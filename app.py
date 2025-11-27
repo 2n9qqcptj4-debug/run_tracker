@@ -2,9 +2,9 @@
 # DEBUG OPENAI IMPORT — MUST BE AT TOP OF FILE
 # ======================================================
 import sys
-
 print(">>> PYTHON PATH:", sys.path)
 
+# Import openai safely for debug
 try:
     import openai
     print(">>> OPENAI MODULE:", openai)
@@ -28,7 +28,7 @@ from datetime import datetime, timedelta
 
 
 # ------------------------------------------------------
-# MANUALLY LOAD PAGES (Streamlit multipage support)
+# MANUALLY LOAD PAGES
 # ------------------------------------------------------
 def load_pages():
     import pages.feed
@@ -44,7 +44,7 @@ def load_pages():
 
 
 # ------------------------------------------------------
-# HOME PAGE (Beautiful dashboard-style landing page)
+# BEAUTIFUL HOME PAGE
 # ------------------------------------------------------
 def render_home():
     st.title("🏃‍♂️ Run Tracker")
@@ -137,7 +137,7 @@ def render_home():
 
 
 # ------------------------------------------------------
-# MAIN
+# MAIN ENTRY POINT
 # ------------------------------------------------------
 def main():
     st.set_page_config(page_title="Run Tracker", layout="wide")
@@ -145,7 +145,7 @@ def main():
     init_db()
     load_pages()
 
-    # Render custom home page
+    # Always land on the Home page
     render_home()
 
 
