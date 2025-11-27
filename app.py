@@ -2,6 +2,7 @@ import streamlit as st
 from utils.styling import inject_css
 from utils.database import init_db
 
+
 def load_pages():
     import pages.home
     import pages.feed
@@ -15,14 +16,17 @@ def load_pages():
     import pages.settings
     import pages.edit_run
 
+
 def main():
     st.set_page_config(page_title="Run Tracker", layout="wide")
+
     inject_css()
     init_db()
     load_pages()
 
-    st.title("Run Tracker")
-    st.write("Select a page from the sidebar.")
+    # Automatically redirect to Home page
+    st.switch_page("pages/home.py")
+
 
 if __name__ == "__main__":
     main()
