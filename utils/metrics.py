@@ -4,13 +4,13 @@ from datetime import timedelta
 
 def prepare_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Standardizes and computes all metrics needed across the app:
+    Produces a standardized metrics dataframe with:
     - date_dt
+    - distance (float)
     - duration_seconds
     - pace_seconds
-    - pace_min_per_mile
-    - avg_hr / max_hr as numeric
-    - distance as numeric
+    - pace_min_per_mile (string)
+    - avg_hr, max_hr (numeric)
     """
 
     if df.empty:
@@ -19,7 +19,7 @@ def prepare_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
     m = df.copy()
 
     # ---------------------------
-    # DATE PARSING
+    # DATE
     # ---------------------------
     m["date_dt"] = pd.to_datetime(m["date"], errors="coerce")
 
@@ -43,12 +43,9 @@ def prepare_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
     m["duration_seconds"] = m["duration"].apply(parse_duration)
 
     # ---------------------------
-    # PACE → SECONDS PER MILE
+    # PACE PARSING
     # ---------------------------
     def parse_pace(p):
-        """
-        pace may be stored as 'MM:SS', 'HH:MM:SS', or None.
-        """
         try:
             if isinstance(p, (int, float)):
                 return float(p)
@@ -57,19 +54,23 @@ def prepare_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
         except:
             return None
 
-    # If avg_pace exists, parse it
+    # If avg_pace exists
     if "avg_pace" in m.columns:
         m["pace_seconds"] = m["avg_pace"].apply(parse_pace)
     else:
         m["pace_seconds"] = None
 
-    # Compute pace if missing but duration+distance exist
-    missing_pace = m["pace_seconds"].isna() & m["duration_seconds"].notna() & m["distance"].gt(0)
-    m.loc[missing_pace, "pace_seconds"] = (
-        m.loc[missing_pace, "duration_seconds"] / m.loc[missing_pace, "distance"]
+    # Compute pace if missing
+    missing_mask = (
+        m["pace_seconds"].isna()
+        & m["duration_seconds"].notna()
+        & m["distance"].gt(0)
+    )
+    m.loc[missing_mask, "pace_seconds"] = (
+        m.loc[missing_mask, "duration_seconds"] / m.loc[missing_mask, "distance"]
     )
 
-    # For display-friendly pace
+    # Pretty pace
     def pace_to_str(sec):
         try:
             return str(timedelta(seconds=int(sec)))
@@ -79,20 +80,14 @@ def prepare_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
     m["pace_min_per_mile"] = m["pace_seconds"].apply(pace_to_str)
 
     # ---------------------------
-    # HR METRICS CLEANUP
+    # HR FIELDS
     # ---------------------------
     for col in ["avg_hr", "max_hr"]:
         if col in m.columns:
             m[col] = pd.to_numeric(m[col], errors="coerce")
 
     # ---------------------------
-    # EFFORT
-    # ---------------------------
-    if "effort" in m.columns:
-        m["effort"] = pd.to_numeric(m["effort"], errors="coerce")
-
-    # ---------------------------
-    # SORT BY DATE
+    # FINISH
     # ---------------------------
     m = m.sort_values("date_dt")
 
