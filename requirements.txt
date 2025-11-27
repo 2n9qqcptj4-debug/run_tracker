@@ -1,4 +1,10 @@
-streamlit
-pandas
-altair
-openai
+streamlit==1.51.0
+pandas==2.3.3
+numpy==2.3.5
+
+openai==1.55.0
+streamlit-lottie==0.0.3
+requests==2.32.3
+
+python-dateutil==2.9.0.post0
+pytz==2025.2
