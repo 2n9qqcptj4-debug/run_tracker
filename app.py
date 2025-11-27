@@ -5,6 +5,10 @@ from utils.metrics import prepare_metrics_df
 import pandas as pd
 from datetime import datetime, timedelta
 
+print(">>> OPENAI MODULE FILE:", openai.__file__)
+print(">>> OPENAI VERSION:", getattr(openai, "__version__", "NO VERSION"))
+print(">>> OPENAI ATTRIBUTES SAMPLE:", [attr for attr in dir(openai)[:20]])
+
 
 # ------------------------------------------------------
 # Load Pages (ONLY needed if you manually control nav)
