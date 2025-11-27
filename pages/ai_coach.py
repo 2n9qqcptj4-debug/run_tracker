@@ -8,11 +8,14 @@ from utils.prs import calculate_prs
 from utils.ai_helpers import call_ai
 
 
-# --- FIXED efficiency-score helper (Option 1: uses duration_seconds) ---
+# ---------------------------
+# SAFE efficiency score
+# ---------------------------
+
 def compute_efficiency_score(metrics: pd.DataFrame) -> pd.DataFrame:
     """
-    Adds an 'efficiency_score' based on distance, duration_seconds, and avg_hr.
-    Higher score = more efficient.
+    Safe calculation of efficiency_score that will NOT error
+    even if duration_seconds or avg_hr are missing.
     """
 
     if metrics.empty:
@@ -22,55 +25,68 @@ def compute_efficiency_score(metrics: pd.DataFrame) -> pd.DataFrame:
     m = metrics.copy()
     m["efficiency_score"] = None
 
+    # Ensure required columns exist
+    if "duration_seconds" not in m.columns:
+        m["duration_seconds"] = None
+
+    if "avg_hr" not in m.columns:
+        m["avg_hr"] = None
+
+    # Boolean mask
     mask = (
         m["distance"].notna()
         & (m["distance"] > 0)
         & m["duration_seconds"].notna()
+        & (m["duration_seconds"] > 0)
         & m["avg_hr"].notna()
+        & (m["avg_hr"] > 0)
     )
 
-    m.loc[mask, "efficiency_score"] = (
-        m.loc[mask, "distance"]
-        / (m.loc[mask, "duration_seconds"] / 60.0)
-        / m.loc[mask, "avg_hr"]
-        * 1000.0
-    )
+    try:
+        m.loc[mask, "efficiency_score"] = (
+            m.loc[mask, "distance"]
+            / (m.loc[mask, "duration_seconds"] / 60.0)
+            / m.loc[mask, "avg_hr"]
+            * 1000.0
+        )
+    except Exception:
+        pass
 
     return m
 
 
-# ============================
-#  AI COACH PAGE
-# ============================
+# ================================================================
+#    MAIN AI COACH PAGE
+# ================================================================
 
 def render_ai_coach_page():
     st.title("🤖 AI Coach")
 
-    # Load full run log
     df = fetch_runs()
     if df.empty:
-        st.info("Log some runs (or import from Garmin) to use the AI Coach.")
+        st.info("Log some runs to unlock the AI Coach.")
         st.stop()
 
-    # Prepare metrics
+    # Metrics
     metrics = prepare_metrics_df(df)
     metrics = compute_efficiency_score(metrics)
 
-    # data windows
     recent = df.tail(30)
     latest = df.iloc[-1].to_dict()
 
-    # Race goal stored in session
     race_goal = st.session_state.get("race_goal", "Pittsburgh Half – Sub 1:40")
     race_date_str = st.session_state.get("race_date_str", "2026-05-03")
+
     try:
         race_date = datetime.fromisoformat(race_date_str).date()
-    except Exception:
+    except:
         race_date = datetime.today().date()
 
     prs_all = calculate_prs(metrics)
 
-    # 7 Tabs
+    # ---------------------------
+    # Tabs
+    # ---------------------------
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
         [
             "Daily & Weekly",
@@ -83,403 +99,225 @@ def render_ai_coach_page():
         ]
     )
 
-    # ================================================================
+    # ------------------------------------------------------------------
     # TAB 1 — DAILY + WEEKLY
-    # ================================================================
+    # ------------------------------------------------------------------
     with tab1:
-
         col1, col2 = st.columns(2)
 
-        # ---- Last Run Review ----
         with col1:
             st.subheader("Last Run Analysis")
+
             st.write(
-                f"**Most recent run:** {latest.get('date', 'N/A')} — "
-                f"{latest.get('run_type', 'Unknown')} — "
-                f"{latest.get('distance', 'N/A')} mi"
+                f"**{latest.get('date')} — {latest.get('run_type')} — {latest.get('distance')} mi**"
             )
 
-            if st.button("Analyze Last Run", key="ai_last_run"):
+            if st.button("Analyze Last Run"):
                 prompt = f"""
-You are a professional running coach and data analyst.
-
-Please analyze my most recent run in detail. Cover:
-- pacing consistency
-- HR response & efficiency
-- fatigue and recovery needs
-- injury risk (shin splint focus)
-- 3–5 actionable takeaways
+Analyze my most recent run. Review pacing, HR, fatigue, efficiency, 
+and give 3–5 action items.
 
 Run data:
 {latest}
 """
                 st.write(call_ai(prompt))
 
-        # ---- Weekly Review ----
         with col2:
             st.subheader("Weekly Summary")
 
-            last7_mask = pd.to_datetime(df["date"]) >= datetime.today() - timedelta(days=7)
-            last7_df = df[last7_mask]
+            last7 = df[pd.to_datetime(df["date"]) >= (datetime.today() - timedelta(days=7))]
 
-            if last7_df.empty:
-                st.info("No runs in last 7 days.")
+            if last7.empty:
+                st.info("No runs in the last week.")
             else:
-                week_metrics = prepare_metrics_df(last7_df)
-                week_metrics = compute_efficiency_score(week_metrics)
-                week_prs = calculate_prs(week_metrics)
-
-                st.write("**Last 7 days:**")
-                st.dataframe(
-                    last7_df[
-                        ["date", "run_type", "distance", "duration", "avg_hr", "effort"]
-                    ],
-                    use_container_width=True,
-                )
-
-                if st.button("Summarize Last 7 Days", key="ai_week_summary"):
+                if st.button("Summarize Last 7 Days"):
                     prompt = f"""
-Create a detailed summary of my last 7 days of training.
-Cover mileage, HR, pace trends, fatigue, recovery, and suggested next steps.
+Create a weekly training summary.
 
-Last 7 runs:
-{last7_df.to_dict('records')}
+Last 7 days:
+{last7.to_dict('records')}
 
-Weekly PR snapshot:
-{week_prs}
+PR snapshot:
+{prs_all}
 """
                     st.write(call_ai(prompt))
 
-    # ================================================================
+    # ------------------------------------------------------------------
     # TAB 2 — WORKOUT GENERATOR
-    # ================================================================
+    # ------------------------------------------------------------------
     with tab2:
-        st.subheader("Generate Tomorrow’s Workout")
+        st.subheader("Generate Tomorrow's Workout")
 
-        focus = st.selectbox(
-            "Primary focus",
-            ["Balanced", "Speed", "Endurance", "Tempo / Threshold", "Recovery"],
-        )
+        focus = st.selectbox("Focus", ["Balanced", "Speed", "Tempo", "Endurance", "Recovery"])
+        terrain = st.selectbox("Terrain", ["Road", "Treadmill", "Trail", "Hilly"])
+        time_avail = st.slider("Available time (min)", 20, 150, 60)
 
-        terrain = st.selectbox(
-            "Terrain",
-            ["Road", "Treadmill", "Trail", "Mixed/Hills"],
-        )
-
-        available_time = st.slider(
-            "Available time (minutes)",
-            min_value=20, max_value=150, value=60, step=5
-        )
-
-        if st.button("Create Workout", key="ai_tomorrow"):
+        if st.button("Generate Workout"):
             prompt = f"""
-Design TOMORROW'S WORKOUT.
+Create tomorrow's workout.
 
 Focus: {focus}
 Terrain: {terrain}
-Available Time: {available_time} minutes
-Race Goal: {race_goal} on {race_date}
+Available Time: {time_avail} minutes
 
-Requirements:
-- warm-up + main set + cooldown
-- clear pacing instructions
-- HR guidance
-- execution tips
-
-Recent training (~30 runs):
+Recent training:
 {recent.to_dict('records')}
 """
             st.write(call_ai(prompt))
 
-    # ================================================================
+    # ------------------------------------------------------------------
     # TAB 3 — 7-DAY PLAN
-    # ================================================================
+    # ------------------------------------------------------------------
     with tab3:
         st.subheader("Plan Next 7 Days")
 
         days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-        days_per_week = st.slider(
-            "Days per week",
-            min_value=2, max_value=7, value=5
-        )
+        d_per_week = st.slider("Days per week", 2, 7, 5)
+        train_days = st.multiselect("Training days", days, default=["Mon", "Tue", "Thu", "Sat", "Sun"])
+        hard_days = st.multiselect("Hard days", days, default=["Tue", "Thu"])
+        rest_days = st.multiselect("Rest days", days, default=["Fri"])
+        long_day = st.selectbox("Long run day", days, index=6)
 
-        training_days = st.multiselect(
-            "Training Days", options=days,
-            default=["Mon", "Tue", "Thu", "Sat", "Sun"]
-        )
+        if st.button("Generate 7-Day Plan"):
+            prompt = f"""
+Design a 7-day running plan.
 
-        hard_days = st.multiselect(
-            "Hard Days (Tempo/Intervals)", options=days,
-            default=["Tue", "Thu"]
-        )
-
-        rest_days = st.multiselect(
-            "Rest Days", options=days,
-            default=["Fri"]
-        )
-
-        long_run_day = st.selectbox("Long Run Day", options=days, index=6)
-
-        secondary_long = st.selectbox(
-            "Optional Second Long Run",
-            ["None"] + days
-        )
-
-        allow_back_to_back = st.checkbox("Allow back-to-back hard days?")
-        allow_doubles = st.checkbox("Allow double days (AM/PM)?")
-
-        if st.button("Generate 7-Day Plan", key="ai_week_plan"):
-            prefs = f"""
-Days/week: {days_per_week}
-Training Days: {training_days}
+Days/week: {d_per_week}
+Training Days: {train_days}
 Hard Days: {hard_days}
 Rest Days: {rest_days}
-Long Run Day: {long_run_day}
-Secondary Long Run: {secondary_long}
-Back-to-back: {allow_back_to_back}
-Doubles: {allow_doubles}
-"""
+Long Run Day: {long_day}
 
-            prompt = f"""
-Design a **7-day training plan** for a half-marathon-focused runner.
-
-Training preferences:
-{prefs}
-
-Recent training (~30 runs):
+Recent runs:
 {recent.to_dict('records')}
-
-Return Mon-Sun schedule with run type, distance, pacing/HR, and weekly goals.
 """
             st.write(call_ai(prompt))
 
-    # ================================================================
+    # ------------------------------------------------------------------
     # TAB 4 — RACE SIMULATOR
-    # ================================================================
+    # ------------------------------------------------------------------
     with tab4:
         st.subheader("Race Day Simulator")
 
-        race_type = st.selectbox(
-            "Race Distance",
-            ["5K", "10K", "Half Marathon", "Marathon"],
-            index=2
-        )
+        race_type = st.selectbox("Race Type", ["5K", "10K", "Half Marathon", "Marathon"], index=2)
+        strategy = st.selectbox("Strategy", ["Conservative", "Even Split", "Negative Split", "Aggressive"])
 
-        strategy = st.selectbox(
-            "Strategy",
-            ["Conservative", "Even Split", "Slight Negative Split", "Aggressive"],
-            index=2
-        )
-
-        if st.button("Simulate Race", key="ai_race"):
+        if st.button("Simulate Race"):
             prompt = f"""
-Simulate my upcoming {race_type} race.
+Simulate my {race_type} race on {race_date}.
 
-Race Goal: {race_goal}
-Race Date: {race_date}
 Strategy: {strategy}
-
-Provide:
-- realistic finish time
-- mile-by-mile pacing
-- HR guidance
-- fueling plan
-- mistakes to avoid
+Goal: {race_goal}
 
 Full training history:
 {df.to_dict('records')}
 """
             st.write(call_ai(prompt))
 
-    # ================================================================
+    # ------------------------------------------------------------------
     # TAB 5 — INJURY RISK
-    # ================================================================
+    # ------------------------------------------------------------------
     with tab5:
-        st.subheader("Injury Risk Assessment")
+        st.subheader("Injury Risk (Shin Splint Focus)")
 
-        lookback = st.slider(
-            "Look back (days)",
-            min_value=7, max_value=42, value=21, step=7
-        )
+        lookback = st.slider("Look back days", 7, 42, 21)
+        window = df[pd.to_datetime(df["date"]) >= (datetime.today() - timedelta(days=lookback))]
 
-        cutoff = datetime.today() - timedelta(days=lookback)
-        window_df = df[pd.to_datetime(df["date"]) >= cutoff]
-
-        st.write(f"Using last **{lookback} days** of training.")
-
-        if st.button("Evaluate Injury Risk", key="ai_injury"):
+        if st.button("Evaluate Injury Risk"):
             prompt = f"""
-Evaluate my injury risk (shin splint focus).
+Evaluate injury risk (shin splints focus).
 
-Look at:
-- mileage changes
-- HR stress
-- elevation load
-- effort levels
-- pain notes
-- rest day spacing
-
-Return risk level + actionable adjustments.
-
-Training window:
-{window_df.to_dict('records')}
+Training window ({lookback} days):
+{window.to_dict('records')}
 """
             st.write(call_ai(prompt))
 
-    # ================================================================
+    # ------------------------------------------------------------------
     # TAB 6 — PR MILESTONES
-    # ================================================================
+    # ------------------------------------------------------------------
     with tab6:
         st.subheader("PR Milestone Analysis")
 
-        st.write("Current PRs:")
-        st.json(prs_all or {})
+        st.json(prs_all)
 
-        if st.button("Analyze PRs", key="ai_prs"):
-            trend = metrics.sort_values("date_dt").to_dict("records")
+        if st.button("Analyze PR Progress"):
             prompt = f"""
-Analyze my PR profile, progression, and likely next breakthrough.
+Analyze my PR trends and next likely PR breakthrough.
 
-Training data:
-{trend}
+Full metrics:
+{metrics.to_dict('records')}
 
 Current PRs:
 {prs_all}
-
-Provide:
-- strongest/weakest PRs
-- next likely improvement
-- 6–8 week PR mini-plan
-- 4–6 key workouts
 """
             st.write(call_ai(prompt))
 
-    # ================================================================
-    # TAB 7 — TRAINING BLOCK
-    # ================================================================
+    # ------------------------------------------------------------------
+    # TAB 7 — TRAINING BLOCK GENERATOR
+    # ------------------------------------------------------------------
     with tab7:
-        st.subheader("Build a Training Block")
+        st.subheader("Training Block Builder")
 
-        race_types = [
-            "5K", "10K", "Half Marathon", "Marathon",
-            "50K Ultra", "50 Mile Ultra", "100K Ultra", "100 Mile Ultra"
-        ]
-
-        block_race = st.selectbox("Race Type", race_types, index=2)
-
-        goal_mode = st.radio(
-            "Goal Type",
-            ["Train to Finish", "Train for a Specific Time"]
-        )
-
-        target_time = None
-        if goal_mode == "Train for a Specific Time":
-            target_time = st.text_input(
-                "Target Finish Time (HH:MM:SS)",
-                placeholder="e.g., 01:40:00"
-            )
-
-        block_race_date = st.date_input("Race Date", value=race_date)
-
-        block_length = st.slider(
-            "Block Length (weeks)",
-            min_value=4, max_value=28, value=12
-        )
-
-        taper = st.selectbox(
-            "Taper Length",
-            ["1 week", "10 days", "2 weeks", "3 weeks"],
+        block_distance = st.selectbox(
+            "Race Type",
+            ["5K", "10K", "Half Marathon", "Marathon", "50K", "50 Mile", "100K", "100 Mile"],
             index=2
         )
 
-        cutback = st.checkbox(
-            "Include mid-block cutback (week 6–8)?", value=True
-        )
+        goal_mode = st.radio("Goal Mode", ["Finish", "Specific Time"])
+        target_time = st.text_input("Goal Time (HH:MM:SS)", "") if goal_mode == "Specific Time" else None
 
-        st.markdown("### Schedule Preferences")
+        block_weeks = st.slider("Block length (weeks)", 4, 28, 12)
+        taper = st.selectbox("Taper length", ["1 week", "10 days", "2 weeks", "3 weeks"])
+        cutback = st.checkbox("Mid-block cutback?", True)
 
         days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-        block_days = st.multiselect(
-            "Training Days",
-            days,
-            default=["Mon", "Tue", "Thu", "Sat", "Sun"]
-        )
-        block_days_per_week = len(block_days)
+        train_days = st.multiselect("Training Days", days, default=["Mon", "Tue", "Thu", "Sat", "Sun"])
+        hard = st.multiselect("Hard Days", days, default=["Tue", "Thu"])
+        rest = st.multiselect("Rest Days", days, default=["Fri"])
+        long_day = st.selectbox("Long Run Day", days, index=6)
+        secondary = st.selectbox("Secondary Long Run", ["None"] + days)
 
-        block_hard = st.multiselect(
-            "Hard Days (tempo/interval)",
-            days,
-            default=["Tue", "Thu"]
-        )
+        b2b = st.checkbox("Allow back-to-back hard days?")
+        doubles = st.checkbox("Allow doubles (AM/PM)?")
 
-        block_rest = st.multiselect(
-            "Rest Days",
-            days,
-            default=["Fri"]
-        )
+        if st.button("Generate Training Block"):
+            prefs = {
+                "training_days": train_days,
+                "hard_days": hard,
+                "rest_days": rest,
+                "long_day": long_day,
+                "secondary_long": secondary,
+                "back_to_back": b2b,
+                "doubles": doubles,
+            }
 
-        block_long = st.selectbox(
-            "Long Run Day",
-            days,
-            index=6
-        )
+            prompt = f"""
+Build a {block_weeks}-week training block.
 
-        block_secondary = st.selectbox(
-            "Optional Secondary Long Run",
-            ["None"] + days
-        )
+Race: {block_distance}
+Goal Mode: {goal_mode}
+Target Time: {target_time}
 
-        allow_b2b = st.checkbox("Allow back-to-back hard days?")
-        allow_doubles = st.checkbox("Allow double days (AM/PM)?")
-
-        if st.button("Generate Training Block", key="ai_block"):
-            prefs = f"""
-Block Length: {block_length} weeks
+Block Length: {block_weeks}
 Taper: {taper}
 Cutback: {cutback}
 
-Training Days: {block_days}
-Days/Week: {block_days_per_week}
-Hard Days: {block_hard}
-Rest Days: {block_rest}
-Long Run Day: {block_long}
-Secondary Long Run: {block_secondary}
-Back-to-back: {allow_b2b}
-Doubles: {allow_doubles}
-"""
-
-            prompt = f"""
-Build a {block_length}-week training block for the athlete.
-
-Race: {block_race}
-Goal Mode: {goal_mode}
-Target Time: {target_time}
-Race Date: {block_race_date}
-
-Preferences:
+Schedule:
 {prefs}
 
-Requirements:
-- Base → Build → Peak → Taper
-- Progressive mileage
-- Cutback if chosen
-- Realistic workouts
-- Weekly breakdowns (key workouts + long run)
-- Paces + HR guidance
-- Summary for each phase
-
-Training History:
+Full training history:
 {df.to_dict('records')}
 
-Current PRs:
+PRs:
 {prs_all}
 """
             st.write(call_ai(prompt))
 
 
-# Streamlit wrapper
+# wrapper
 def main():
     render_ai_coach_page()
 
