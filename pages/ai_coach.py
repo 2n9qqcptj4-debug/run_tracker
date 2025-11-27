@@ -9,15 +9,9 @@ from utils.ai_helpers import call_ai
 
 
 # ---------------------------
-# SAFE efficiency score
+# SAFE EFFICIENCY SCORE
 # ---------------------------
-
 def compute_efficiency_score(metrics: pd.DataFrame) -> pd.DataFrame:
-    """
-    Safe calculation of efficiency_score that will NOT error
-    even if duration_seconds or avg_hr are missing.
-    """
-
     if metrics.empty:
         metrics["efficiency_score"] = None
         return metrics
@@ -25,14 +19,12 @@ def compute_efficiency_score(metrics: pd.DataFrame) -> pd.DataFrame:
     m = metrics.copy()
     m["efficiency_score"] = None
 
-    # Ensure required columns exist
+    # Ensure columns exist
     if "duration_seconds" not in m.columns:
         m["duration_seconds"] = None
-
     if "avg_hr" not in m.columns:
         m["avg_hr"] = None
 
-    # Boolean mask
     mask = (
         m["distance"].notna()
         & (m["distance"] > 0)
@@ -55,19 +47,19 @@ def compute_efficiency_score(metrics: pd.DataFrame) -> pd.DataFrame:
     return m
 
 
-# ================================================================
-#    MAIN AI COACH PAGE
-# ================================================================
 
+# ============================
+#  BEAUTIFUL AI COACH PAGE
+# ============================
 def render_ai_coach_page():
     st.title("🤖 AI Coach")
+    st.caption("Your personalized running guidance powered by advanced analytics + AI.")
 
     df = fetch_runs()
     if df.empty:
-        st.info("Log some runs to unlock the AI Coach.")
-        st.stop()
+        st.info("Log some runs (or import from Garmin) to unlock AI Coach insights.")
+        return
 
-    # Metrics
     metrics = prepare_metrics_df(df)
     metrics = compute_efficiency_score(metrics)
 
@@ -84,240 +76,312 @@ def render_ai_coach_page():
 
     prs_all = calculate_prs(metrics)
 
-    # ---------------------------
+    # Smooth layout spacing
+    st.markdown(" ")
+
     # Tabs
-    # ---------------------------
     tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
         [
-            "Daily & Weekly",
-            "Workout Generator",
-            "7-Day Plan",
-            "Race Simulator",
-            "Injury Risk AI",
-            "PR Milestones",
-            "Training Block",
+            "📅 Daily + Weekly",
+            "⚡ Workout Generator",
+            "🗓️ 7-Day Planner",
+            "🏁 Race Simulator",
+            "🩻 Injury Risk",
+            "🎖️ PR Milestones",
+            "📦 Training Block",
         ]
     )
 
     # ------------------------------------------------------------------
-    # TAB 1 — DAILY + WEEKLY
+    # TAB 1 — DAILY + WEEKLY ANALYSIS
     # ------------------------------------------------------------------
     with tab1:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("🏃 Last Run Analysis")
+
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("Last Run Analysis")
-
-            st.write(
-                f"**{latest.get('date')} — {latest.get('run_type')} — {latest.get('distance')} mi**"
-            )
-
-            if st.button("Analyze Last Run"):
-                prompt = f"""
-Analyze my most recent run. Review pacing, HR, fatigue, efficiency, 
-and give 3–5 action items.
-
-Run data:
-{latest}
-"""
-                st.write(call_ai(prompt))
+            st.write(f"**Date:** {latest.get('date')}")
+            st.write(f"**Type:** {latest.get('run_type')}")
+            st.write(f"**Distance:** {latest.get('distance')} mi")
 
         with col2:
-            st.subheader("Weekly Summary")
+            st.write(f"**Duration:** {latest.get('duration')}")
+            st.write(f"**Avg Pace:** {latest.get('avg_pace')}")
+            st.write(f"**Avg HR:** {latest.get('avg_hr') or '—'} bpm")
 
-            last7 = df[pd.to_datetime(df["date"]) >= (datetime.today() - timedelta(days=7))]
+        st.markdown("</div>", unsafe_allow_html=True)
 
-            if last7.empty:
-                st.info("No runs in the last week.")
-            else:
-                if st.button("Summarize Last 7 Days"):
-                    prompt = f"""
-Create a weekly training summary.
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        if st.button("🔍 Analyze Last Run", key="ai_last_run_pretty"):
+            with st.spinner("Analyzing your run..."):
+                result = call_ai(f"""
+Provide a polished and structured analysis of the following run:
+{latest}
 
-Last 7 days:
+Include:
+- pacing & HR interpretation
+- biomechanical or form insights
+- fatigue & recovery guidance
+- injury risk notes
+- 3–5 actionable improvements
+""")
+            st.markdown("### 🧠 AI Insights")
+            st.markdown(f"<div class='card'>{result}</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # WEEKLY SUMMARY
+        week_mask = pd.to_datetime(df["date"]) >= (datetime.today() - timedelta(days=7))
+        last7 = df[week_mask]
+
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("📅 Weekly Summary (Last 7 Days)")
+
+        if not last7.empty:
+            total_miles = last7["distance"].sum()
+            runs_count = len(last7)
+            avg_effort = last7["effort"].mean() if "effort" in last7 else None
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Mileage", f"{total_miles:.1f} mi")
+            c2.metric("Runs", runs_count)
+            if avg_effort:
+                c3.metric("Avg Effort", f"{avg_effort:.1f}/10")
+
+        if st.button("📊 Analyze Week", key="ai_week_pretty"):
+            with st.spinner("Reviewing your week..."):
+                result = call_ai(f"""
+Analyze the last 7 days of training:
 {last7.to_dict('records')}
 
-PR snapshot:
-{prs_all}
-"""
-                    st.write(call_ai(prompt))
+Provide:
+- a clean weekly summary
+- load progression
+- where fatigue or overreaching may appear
+- readiness for intervals or long runs
+- 2–3 recommended workouts next week
+""")
+            st.markdown("### 📘 Weekly Insights")
+            st.markdown(f"<div class='card'>{result}</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 
     # ------------------------------------------------------------------
     # TAB 2 — WORKOUT GENERATOR
     # ------------------------------------------------------------------
     with tab2:
-        st.subheader("Generate Tomorrow's Workout")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("⚡ Generate Tomorrow's Workout")
 
-        focus = st.selectbox("Focus", ["Balanced", "Speed", "Tempo", "Endurance", "Recovery"])
-        terrain = st.selectbox("Terrain", ["Road", "Treadmill", "Trail", "Hilly"])
-        time_avail = st.slider("Available time (min)", 20, 150, 60)
+        focus = st.selectbox("Primary Focus", ["Balanced", "Speed", "Endurance", "Tempo", "Recovery"])
+        terrain = st.selectbox("Terrain", ["Road", "Trail", "Treadmill", "Hilly"])
+        time_avail = st.slider("Available Time (minutes)", 20, 150, 60)
 
-        if st.button("Generate Workout"):
-            prompt = f"""
-Create tomorrow's workout.
-
+        if st.button("⚡ Create Workout", key="gen_workout"):
+            with st.spinner("Designing workout..."):
+                result = call_ai(f"""
+Create a structured workout based on:
 Focus: {focus}
 Terrain: {terrain}
-Available Time: {time_avail} minutes
+Time available: {time_avail} minutes
 
-Recent training:
+Use athlete context:
 {recent.to_dict('records')}
-"""
-            st.write(call_ai(prompt))
+
+Return:
+- warm-up
+- main set (intervals, pacing, HR zones)
+- cooldown
+- execution tips
+""")
+            st.markdown("### 🏋️ Workout Plan")
+            st.markdown(f"<div class='card'>{result}</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 
     # ------------------------------------------------------------------
     # TAB 3 — 7-DAY PLAN
     # ------------------------------------------------------------------
     with tab3:
-        st.subheader("Plan Next 7 Days")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("🗓️ Plan the Next 7 Days")
 
-        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
 
-        d_per_week = st.slider("Days per week", 2, 7, 5)
-        train_days = st.multiselect("Training days", days, default=["Mon", "Tue", "Thu", "Sat", "Sun"])
-        hard_days = st.multiselect("Hard days", days, default=["Tue", "Thu"])
-        rest_days = st.multiselect("Rest days", days, default=["Fri"])
-        long_day = st.selectbox("Long run day", days, index=6)
+        days_week = st.slider("Days Per Week", 2, 7, 5)
+        training_days = st.multiselect("Training Days", days, default=["Mon","Tue","Thu","Sat","Sun"])
+        hard_days = st.multiselect("Hard Workout Days", days, default=["Tue","Thu"])
+        rest_days = st.multiselect("Rest Days", days, default=["Fri"])
+        long_day = st.selectbox("Long Run Day", days, index=6)
 
-        if st.button("Generate 7-Day Plan"):
-            prompt = f"""
-Design a 7-day running plan.
+        if st.button("🗓️ Generate 7-Day Plan"):
+            with st.spinner("Generating plan..."):
+                result = call_ai(f"""
+Design a 7-day training plan.
 
-Days/week: {d_per_week}
-Training Days: {train_days}
-Hard Days: {hard_days}
-Rest Days: {rest_days}
-Long Run Day: {long_day}
+Days per week: {days_week}
+Training days: {training_days}
+Hard days: {hard_days}
+Rest days: {rest_days}
+Long run day: {long_day}
 
-Recent runs:
+Recent training:
 {recent.to_dict('records')}
-"""
-            st.write(call_ai(prompt))
+""")
+            st.markdown("### 📅 Weekly Plan")
+            st.markdown(f"<div class='card'>{result}</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 
     # ------------------------------------------------------------------
     # TAB 4 — RACE SIMULATOR
     # ------------------------------------------------------------------
     with tab4:
-        st.subheader("Race Day Simulator")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("🏁 Race Day Simulator")
 
-        race_type = st.selectbox("Race Type", ["5K", "10K", "Half Marathon", "Marathon"], index=2)
-        strategy = st.selectbox("Strategy", ["Conservative", "Even Split", "Negative Split", "Aggressive"])
+        race_type = st.selectbox("Race Type", ["5K","10K","Half Marathon","Marathon"], index=2)
+        strategy = st.selectbox("Pacing Strategy", ["Conservative","Even","Negative Split","Aggressive"])
 
-        if st.button("Simulate Race"):
-            prompt = f"""
-Simulate my {race_type} race on {race_date}.
+        if st.button("🏁 Simulate Race"):
+            with st.spinner("Simulating race..."):
+                result = call_ai(f"""
+Simulate my {race_type} using {strategy} strategy.
+Race goal: {race_goal}
+Race date: {race_date}
 
-Strategy: {strategy}
-Goal: {race_goal}
-
-Full training history:
+Use full training history:
 {df.to_dict('records')}
-"""
-            st.write(call_ai(prompt))
+
+Return:
+- predicted finish time
+- mile splits
+- HR guidance
+- fueling plan
+- mistakes to avoid
+""")
+            st.markdown("### 🏁 Race Simulation")
+            st.markdown(f"<div class='card'>{result}</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 
     # ------------------------------------------------------------------
     # TAB 5 — INJURY RISK
     # ------------------------------------------------------------------
     with tab5:
-        st.subheader("Injury Risk (Shin Splint Focus)")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("🩻 Injury Risk Assessment")
 
-        lookback = st.slider("Look back days", 7, 42, 21)
+        lookback = st.slider("Lookback (days)", 7, 42, 21)
         window = df[pd.to_datetime(df["date"]) >= (datetime.today() - timedelta(days=lookback))]
 
-        if st.button("Evaluate Injury Risk"):
-            prompt = f"""
-Evaluate injury risk (shin splints focus).
+        if st.button("🩻 Evaluate Risk"):
+            with st.spinner("Evaluating injury risk..."):
+                result = call_ai(f"""
+Evaluate injury risk with focus on shin splints.
+Lookback window: last {lookback} days.
 
-Training window ({lookback} days):
+Training data:
 {window.to_dict('records')}
-"""
-            st.write(call_ai(prompt))
+""")
+            st.markdown("### 🩻 Risk Analysis")
+            st.markdown(f"<div class='card'>{result}</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 
     # ------------------------------------------------------------------
     # TAB 6 — PR MILESTONES
     # ------------------------------------------------------------------
     with tab6:
-        st.subheader("PR Milestone Analysis")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("🎖️ PR Analysis")
 
-        st.json(prs_all)
+        st.write("Your current PRs:")
+        st.json(prs_all or {})
 
-        if st.button("Analyze PR Progress"):
-            prompt = f"""
-Analyze my PR trends and next likely PR breakthrough.
+        if st.button("🎯 Analyze PR Progress"):
+            with st.spinner("Analyzing PR progression..."):
+                result = call_ai(f"""
+Analyze current PRs and likely next breakthrough.
 
-Full metrics:
+Training metrics:
 {metrics.to_dict('records')}
 
 Current PRs:
 {prs_all}
-"""
-            st.write(call_ai(prompt))
+""")
+            st.markdown("### 🎯 PR Insights")
+            st.markdown(f"<div class='card'>{result}</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
 
     # ------------------------------------------------------------------
     # TAB 7 — TRAINING BLOCK GENERATOR
     # ------------------------------------------------------------------
     with tab7:
-        st.subheader("Training Block Builder")
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.subheader("📦 Build a Training Block")
 
-        block_distance = st.selectbox(
-            "Race Type",
-            ["5K", "10K", "Half Marathon", "Marathon", "50K", "50 Mile", "100K", "100 Mile"],
-            index=2
-        )
+        block_race = st.selectbox("Race Type", [
+            "5K","10K","Half Marathon","Marathon","50K","50 Mile","100K","100 Mile"
+        ], index=2)
 
-        goal_mode = st.radio("Goal Mode", ["Finish", "Specific Time"])
-        target_time = st.text_input("Goal Time (HH:MM:SS)", "") if goal_mode == "Specific Time" else None
+        goal_mode = st.radio("Goal Type", ["Finish","Specific Time"])
+        goal_time = None
+        if goal_mode == "Specific Time":
+            goal_time = st.text_input("Target Finish Time (HH:MM:SS)")
 
-        block_weeks = st.slider("Block length (weeks)", 4, 28, 12)
-        taper = st.selectbox("Taper length", ["1 week", "10 days", "2 weeks", "3 weeks"])
-        cutback = st.checkbox("Mid-block cutback?", True)
+        block_weeks = st.slider("Block Length (weeks)", 4, 28, 12)
+        taper = st.selectbox("Taper Length", ["1 week","10 days","2 weeks","3 weeks"])
 
-        days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-        train_days = st.multiselect("Training Days", days, default=["Mon", "Tue", "Thu", "Sat", "Sun"])
-        hard = st.multiselect("Hard Days", days, default=["Tue", "Thu"])
+        days = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+        train_days = st.multiselect("Training Days", days, default=["Mon","Tue","Thu","Sat","Sun"])
+        hard = st.multiselect("Hard Days", days, default=["Tue","Thu"])
         rest = st.multiselect("Rest Days", days, default=["Fri"])
         long_day = st.selectbox("Long Run Day", days, index=6)
-        secondary = st.selectbox("Secondary Long Run", ["None"] + days)
 
-        b2b = st.checkbox("Allow back-to-back hard days?")
-        doubles = st.checkbox("Allow doubles (AM/PM)?")
-
-        if st.button("Generate Training Block"):
-            prefs = {
-                "training_days": train_days,
-                "hard_days": hard,
-                "rest_days": rest,
-                "long_day": long_day,
-                "secondary_long": secondary,
-                "back_to_back": b2b,
-                "doubles": doubles,
-            }
-
-            prompt = f"""
+        if st.button("📦 Generate Training Block"):
+            with st.spinner("Building your training block..."):
+                result = call_ai(f"""
 Build a {block_weeks}-week training block.
 
-Race: {block_distance}
-Goal Mode: {goal_mode}
-Target Time: {target_time}
+Race: {block_race}
+Goal: {goal_mode}
+Target time: {goal_time}
 
-Block Length: {block_weeks}
-Taper: {taper}
-Cutback: {cutback}
+Schedule preferences:
+Training days: {train_days}
+Hard days: {hard}
+Rest days: {rest}
+Long run day: {long_day}
 
-Schedule:
-{prefs}
-
-Full training history:
+Training history:
 {df.to_dict('records')}
 
-PRs:
+Current PRs:
 {prs_all}
-"""
-            st.write(call_ai(prompt))
+""")
+            st.markdown("### 📦 Training Block Plan")
+            st.markdown(f"<div class='card'>{result}</div>", unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
-# wrapper
+
+# STREAMLIT WRAPPER
 def main():
     render_ai_coach_page()
 
