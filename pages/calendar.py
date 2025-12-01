@@ -1,4 +1,7 @@
 import streamlit as st
+from utils.styling import inject_css
+inject_css()
+
 import pandas as pd
 import calendar
 from datetime import datetime, date, timedelta
@@ -57,3 +60,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
