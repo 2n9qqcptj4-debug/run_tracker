@@ -1,101 +1,147 @@
 import streamlit as st
-from utils.styling import inject_css
-inject_css()
-
 import pandas as pd
 from utils.database import fetch_runs, update_run, delete_run
+from datetime import datetime, timedelta
 
 
+# ---------------------------------------------------------
+# Utility — parse "0 days 00:30:00"
+# ---------------------------------------------------------
+def parse_duration_to_seconds(duration_str):
+    """
+    Accepts either:
+    - "0 days 00:30:00"
+    - "00:30:00"
+    - "HH:MM:SS"
+    Returns seconds (int)
+    """
+    try:
+        if "days" in duration_str:
+            days, time = duration_str.split(" days ")
+            days = int(days)
+        else:
+            days = 0
+            time = duration_str
+
+        h, m, s = time.split(":")
+        return days * 86400 + int(h) * 3600 + int(m) * 60 + int(s)
+    except:
+        return None
+
+
+# ---------------------------------------------------------
+# Edit Run Page
+# ---------------------------------------------------------
 def render_edit_run_page():
     st.title("✏️ Edit Run")
+    st.caption("Modify your saved run or delete it permanently.")
 
     df = fetch_runs()
 
     if df.empty:
-        st.warning("No runs found. Log a run first.")
+        st.error("No runs available to edit.")
         return
 
-    # --------------------------------------------------
-    # Select the run to edit
-    # --------------------------------------------------
-    st.subheader("Choose a run to edit")
+    df = df.sort_values(by="date", ascending=False).reset_index(drop=True)
 
-    df_sorted = df.sort_values("date", ascending=False)
-    run_options = {
-        f"{row['date']} – {row['run_type']} – {row['distance']} mi": row["id"]
-        for _, row in df_sorted.iterrows()
-    }
+    # ----------------------------
+    # Dropdown to select run
+    # ----------------------------
+    run_labels = [
+        f"{row['id']} — {row['date']} · {row['run_type']} · {row['distance']} mi"
+        for _, row in df.iterrows()
+    ]
 
-    selected_label = st.selectbox("Select a run:", list(run_options.keys()))
-    selected_id = run_options[selected_label]
+    selected_label = st.selectbox("Select a run to edit:", run_labels)
 
-    # Get selected run record
-    run = df[df["id"] == selected_id].iloc[0]
+    selected_id = int(selected_label.split("—")[0].strip())
+    selected_row = df[df["id"] == selected_id].iloc[0]
 
-    # --------------------------------------------------
-    # Edit Fields
-    # --------------------------------------------------
-    st.subheader("Edit Run Details")
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
 
-    new_date = st.date_input("Date", pd.to_datetime(run["date"]))
+    st.subheader("Run Details")
 
-    new_run_type = st.selectbox(
+    # ----------------------------
+    # Editable fields
+    # ----------------------------
+    new_date = st.date_input("Date", datetime.fromisoformat(selected_row["date"]))
+
+    new_type = st.selectbox(
         "Run Type",
         ["Easy", "Tempo", "Interval", "Long", "Race", "Recovery"],
-        index=["Easy", "Tempo", "Interval", "Long", "Race", "Recovery"].index(run["run_type"]),
+        index=["Easy", "Tempo", "Interval", "Long", "Race", "Recovery"].index(selected_row["run_type"])
     )
 
-    new_distance = st.number_input(
-        "Distance (miles)", min_value=0.0, value=float(run["distance"]), step=0.1
-    )
+    new_distance = st.number_input("Distance (mi)", value=float(selected_row["distance"]), min_value=0.0, step=0.1)
 
-    # Duration input
-    new_duration = st.text_input(
-        "Duration (HH:MM:SS)",
-        value=str(run["duration"]) if isinstance(run["duration"], str) else "00:00:00",
-    )
+    # Duration (accepts HH:MM:SS)
+    duration_str = selected_row["duration"]
+    if "days" in duration_str:
+        _, t = duration_str.split(" days ")
+    else:
+        t = duration_str
 
-    new_avg_hr = st.number_input(
-        "Avg HR (optional)",
-        min_value=0,
-        max_value=250,
-        value=int(run["avg_hr"]) if pd.notna(run["avg_hr"]) else 0,
-    )
+    new_duration_str = st.text_input("Duration (HH:MM:SS)", value=t)
 
-    new_effort = st.slider("Effort (1–10)", 1, 10, int(run["effort"]))
+    # Pace
+    new_pace = st.text_input("Avg Pace (MM:SS)", value=selected_row.get("avg_pace", ""))
 
-    # --------------------------------------------------
-    # Save Changes Button
-    # --------------------------------------------------
-    if st.button("💾 Save Changes"):
-        update_run(
-            run_id=selected_id,
-            date=new_date,
-            run_type=new_run_type,
-            distance=new_distance,
-            duration=new_duration,
-            avg_hr=new_avg_hr,
-            effort=new_effort,
-        )
-        st.success("Run updated successfully!")
-        st.experimental_rerun()
+    # HR
+    new_hr = st.number_input("Avg HR (bpm)", value=int(selected_row.get("avg_hr", 0)), min_value=0, step=1)
 
-    st.write("---")
+    # Effort
+    new_effort = st.slider("Effort (1–10)", 1, 10, int(selected_row.get("effort", 5)))
 
-    # --------------------------------------------------
-    # DELETE RUN BUTTON
-    # --------------------------------------------------
-    st.subheader("❌ Delete This Run")
+    # Notes
+    new_notes = st.text_area("Notes", value=selected_row.get("notes", ""))
 
-    delete_confirm = st.checkbox("I understand that this cannot be undone", key="delete_confirm")
 
-    if st.button("🗑️ Delete Run"):
-        if delete_confirm:
-            delete_run(selected_id)
-            st.error("Run deleted.")
-            st.experimental_rerun()
-        else:
-            st.warning("Please check the confirmation box before deleting.")
+    # ----------------------------
+    # Save button
+    # ----------------------------
+    if st.button("💾 Save Changes", type="primary"):
+        try:
+            seconds = parse_duration_to_seconds(new_duration_str)
+            if seconds is None:
+                st.error("Invalid duration format. Use HH:MM:SS.")
+                return
+
+            update_run(
+                selected_id,
+                {
+                    "date": str(new_date),
+                    "run_type": new_type,
+                    "distance": new_distance,
+                    "duration": f"0 days {new_duration_str}",
+                    "avg_pace": new_pace,
+                    "avg_hr": new_hr,
+                    "effort": new_effort,
+                    "notes": new_notes,
+                },
+            )
+
+            st.success("Run updated successfully!")
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"Failed to update run: {e}")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.write("")
+
+    # ----------------------------
+    # Delete Run
+    # ----------------------------
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.subheader("🗑 Delete This Run")
+
+    if st.button("❌ Delete Run", type="secondary"):
+        delete_run(selected_id)
+        st.success("Run deleted.")
+        st.rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def main():
