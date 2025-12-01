@@ -1,86 +1,69 @@
 import streamlit as st
-
-# Full diagnostic imports
-import sys
-import pkgutil
-import importlib
+from openai import OpenAI
 import traceback
 
-# Try importing OpenAI
-try:
-    import openai
-except Exception as e:
-    st.error(f"❌ Failed to import openai: {e}")
-    openai = None
 
-
-def get_debug_info():
-    info = []
-
-    info.append("🔍 Python version: " + sys.version)
-    
-    if openai:
-        info.append(f"📦 openai module file: {getattr(openai, '__file__', 'NO FILE')}")
-        info.append(f"📦 openai version: {getattr(openai, '__version__', 'NO VERSION')}")
-
-        # Show what the module actually contains
-        attrs = dir(openai)
-        info.append("📦 openai attributes sample: " + ", ".join(attrs[:40]))
-
-    else:
-        info.append("⚠️ openai failed to import")
-
-    return "\n".join(info)
-
-
+# =========================================================
+# CREATE OPENAI CLIENT SAFELY
+# =========================================================
 def get_client():
     """
-    Creates OpenAI client and returns detailed diagnostic info when failing.
+    Creates an OpenAI client using Streamlit secrets.
+    Does NOT pass unsupported args (like proxies).
     """
+
+    debug = []
+
+    # Make sure key exists
+    if "OPENAI_API_KEY" not in st.secrets:
+        debug.append("❌ OPENAI_API_KEY is NOT in st.secrets!")
+        return None
+
+    api_key = st.secrets["OPENAI_API_KEY"]
+    debug.append(f"🔑 API key loaded: {api_key[:4]}...")
+
     try:
-        from openai import OpenAI  # safe import
+        client = OpenAI(api_key=api_key)
+        debug.append("✅ OpenAI client successfully created.")
+        st.session_state["debug_info"] = "\n".join(debug)
+        return client
+
     except Exception as e:
-        return None, f"❌ Could not import OpenAI class:\n{e}\n\nTraceback:\n{traceback.format_exc()}"
-
-    # Try to initialize the client
-    try:
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-        return client, None
-    except Exception as e:
-        return None, f"""
-❌ Failed to initialize OpenAI client
-Error: {e}
-
-📘 Debug Info:
-{get_debug_info()}
-
-Traceback:
-{traceback.format_exc()}
-"""
+        debug.append(f"❌ Failed to initialize client: {e}")
+        st.session_state["debug_info"] = "\n".join(debug)
+        return None
 
 
+# =========================================================
+# CALL OPENAI SAFELY
+# =========================================================
 def call_ai(prompt: str):
     """
-    Sends prompt to OpenAI with full debug reporting.
+    Sends a prompt to OpenAI and returns the response text.
     """
-    client, err = get_client()
-    if err:
-        return err  # return debug info right to Streamlit
+
+    client = get_client()
+
+    if client is None:
+        return "❌ OpenAI client not initialized. Check API key in Streamlit secrets."
 
     try:
-        resp = client.chat.completions.create(
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": prompt}]
         )
-        return resp.choices[0].message.content
+        return response.choices[0].message.content
+
     except Exception as e:
-        return f"""
-🚨 Unexpected error contacting OpenAI:
-{e}
+        st.session_state["debug_info"] = f"❌ Error calling OpenAI:\n{traceback.format_exc()}"
+        return f"❌ OpenAI Error:\n{e}"
 
-📘 Debug Info:
-{get_debug_info()}
 
-Traceback:
-{traceback.format_exc()}
-"""
+# =========================================================
+# DEBUG INFO VIEWER
+# =========================================================
+def get_debug_info():
+    """
+    Returns whatever debug info has been captured.
+    """
+    return st.session_state.get("debug_info", "No debug info yet.")
