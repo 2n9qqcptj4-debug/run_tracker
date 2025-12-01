@@ -1,4 +1,7 @@
 import streamlit as st
+from utils.styling import inject_css
+inject_css()
+
 from datetime import date
 
 
@@ -54,3 +57,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
