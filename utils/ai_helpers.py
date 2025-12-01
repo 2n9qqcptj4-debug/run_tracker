@@ -1,60 +1,67 @@
 import streamlit as st
+import requests
 import traceback
-import openai   # <-- use module, NOT OpenAI()
+import json
 
-# =========================================================
-# CONFIGURE OPENAI (OLD-STABLE STYLE)
-# =========================================================
-def configure_openai():
-    debug = []
 
-    if "OPENAI_API_KEY" not in st.secrets:
-        debug.append("❌ OPENAI_API_KEY missing from secrets.")
-        st.session_state["debug_info"] = "\n".join(debug)
-        return False
-
-    try:
-        openai.api_key = st.secrets["OPENAI_API_KEY"]
-        debug.append("✅ OpenAI API key loaded.")
-        st.session_state["debug_info"] = "\n".join(debug)
-        return True
-
-    except Exception as e:
-        debug.append(f"❌ Failed to configure OpenAI: {e}")
-        st.session_state["debug_info"] = "\n".join(debug)
-        return False
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
 
 
 # =========================================================
-# CALL OPENAI SAFELY USING OLD API
+# CALL OPENAI USING RAW HTTPS (NO CLIENT — NO PROXIES BUG)
 # =========================================================
 def call_ai(prompt: str):
     """
-    Uses the old OpenAI global-call syntax.
-    This completely bypasses the Client() constructor,
-    so Streamlit's unwanted 'proxies' argument cannot break it.
+    Sends a chat completion request using raw HTTPS.
+    Avoids the Client() constructor completely.
     """
+    debug = []
 
-    if not configure_openai():
-        return "❌ OpenAI not configured. Check your secrets."
+    if "OPENAI_API_KEY" not in st.secrets:
+        debug.append("❌ OPENAI_API_KEY missing from st.secrets.")
+        st.session_state["debug_info"] = "\n".join(debug)
+        return "❌ Missing API key."
+
+    api_key = st.secrets["OPENAI_API_KEY"]
+    debug.append("🔑 API key loaded.")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    body = {
+        "model": "gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "You are a helpful running coach."},
+            {"role": "user", "content": prompt}
+        ]
+    }
 
     try:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful running coach."},
-                {"role": "user", "content": prompt},
-            ],
-        )
-        return response.choices[0].message.content
+        response = requests.post(OPENAI_URL, headers=headers, json=body, timeout=30)
+        debug.append(f"🌐 Status Code: {response.status_code}")
 
-    except Exception as e:
-        st.session_state["debug_info"] = f"❌ OpenAI error:\n{traceback.format_exc()}"
-        return f"❌ Error contacting OpenAI:\n{e}"
+        if response.status_code != 200:
+            debug.append(f"❌ Error Response:\n{response.text}")
+            st.session_state["debug_info"] = "\n".join(debug)
+            return f"❌ OpenAI API Error:\n{response.text}"
+
+        data = response.json()
+        debug.append("✅ Successfully parsed OpenAI response.")
+
+        st.session_state["debug_info"] = "\n".join(debug)
+
+        return data["choices"][0]["message"]["content"]
+
+    except Exception:
+        error_text = traceback.format_exc()
+        st.session_state["debug_info"] = f"❌ Exception:\n{error_text}"
+        return f"❌ Exception contacting OpenAI:\n{error_text}"
 
 
 # =========================================================
-# DEBUG INFO
+# DEBUG INFO VIEWER
 # =========================================================
 def get_debug_info():
     return st.session_state.get("debug_info", "No debug info yet.")
