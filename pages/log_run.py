@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from utils.database import add_run
+
+from utils.database import add_run  # must exist in utils/database.py
 
 
 # =====================================================
@@ -10,51 +11,51 @@ from utils.database import add_run
 def parse_duration_input(t: str):
     """
     Accepts flexible formats:
-    - SS
-    - MM:SS
-    - HH:MM:SS
-    - 5:43
-    - 32:10
-    - 1:02:15
-    - "45" (sec)
-    - "1:30" (1 min 30s)
-    Returns:
-        (seconds, duration_string)
-    """
 
+    - "45"        -> 45 seconds
+    - "5:43"      -> 5 min, 43 sec
+    - "45:10"     -> 45 min, 10 sec
+    - "1:02:15"   -> 1 hr, 2 min, 15 sec
+    - "HH:MM:SS"  generic
+    - "MM:SS"     generic
+
+    Returns:
+        (total_seconds: int | None, pretty_str: str | None)
+    """
     if not t or not isinstance(t, str):
         return None, None
 
     t = t.strip()
 
-    # Case: "45" → seconds
+    # Case: plain integer -> seconds
     if t.isdigit():
         sec = int(t)
         return sec, str(timedelta(seconds=sec))
 
-    # Try direct timedelta
+    # Try direct pandas to_timedelta
     try:
         parsed = pd.to_timedelta(t)
-        return parsed.total_seconds(), str(parsed)
-    except:
+        return int(parsed.total_seconds()), str(parsed)
+    except Exception:
         pass
 
     # Case: MM:SS → prepend 00:
     if t.count(":") == 1:
         try:
             parsed = pd.to_timedelta("00:" + t)
-            return parsed.total_seconds(), str(parsed)
-        except:
+            return int(parsed.total_seconds()), str(parsed)
+        except Exception:
             pass
 
-    # Case: HH:MM:SS but malformed
+    # Case: HH:MM:SS (or similar) but possibly messy
     if t.count(":") == 2:
         try:
             parsed = pd.to_timedelta(t)
-            return parsed.total_seconds(), str(parsed)
-        except:
+            return int(parsed.total_seconds()), str(parsed)
+        except Exception:
             pass
 
+    # If all parsing failed
     return None, None
 
 
@@ -63,20 +64,20 @@ def parse_duration_input(t: str):
 # =====================================================
 def render_log_run():
     st.title("📝 Log a Run")
-    st.caption("Add detailed info about today's workout, how you felt, and training metrics.")
+    st.caption("Capture your workout details, how you felt, and key training metrics.")
 
     with st.form("log_run_form", clear_on_submit=True):
-
         # ============================================
         # RUN DETAILS CARD
         # ============================================
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Run Details")
+        st.subheader("🏃 Run Details")
 
         col1, col2 = st.columns(2)
 
         with col1:
             date = st.date_input("Date", datetime.today())
+
             run_type = st.selectbox(
                 "Run Type",
                 [
@@ -94,7 +95,12 @@ def render_log_run():
                     "Other",
                 ],
             )
-            distance = st.number_input("Distance (miles)", min_value=0.0, format="%.2f")
+
+            distance = st.number_input(
+                "Distance (miles)",
+                min_value=0.0,
+                format="%.2f",
+            )
 
         with col2:
             duration_input = st.text_input(
@@ -102,91 +108,148 @@ def render_log_run():
                 placeholder="e.g. 5:43, 45:10, 1:02:15",
             )
 
-        duration_seconds, duration_str = parse_duration_input(duration_input)
+            duration_seconds, duration_str = parse_duration_input(duration_input)
 
-        # Auto-pace display
-        avg_pace = None
-        if distance > 0 and duration_seconds and duration_seconds > 0:
-            pace_seconds = duration_seconds / distance
-            avg_pace = str(timedelta(seconds=int(pace_seconds)))
-            st.markdown(f"**Auto Pace:** `{avg_pace} / mile`")
-        else:
-            st.caption("Enter a valid duration to auto-calculate pace.")
+            # Auto-calc pace
+            avg_pace = None
+            if distance > 0 and duration_seconds and duration_seconds > 0:
+                pace_seconds = duration_seconds / distance
+                avg_pace = str(timedelta(seconds=int(pace_seconds)))
+                st.markdown(f"**Auto Pace:** `{avg_pace} / mile`")
+            else:
+                st.caption("Enter a valid distance + duration to auto-calc pace.")
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # ============================================
         # HR + PERFORMANCE CARD
         # ============================================
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Heart Rate & Performance")
+        st.subheader("❤️ Heart Rate & Performance")
 
         col3, col4, col5, col6 = st.columns(4)
-        with col3:
-            avg_hr = st.number_input("Average HR", min_value=0, max_value=250, step=1)
-        with col4:
-            max_hr = st.number_input("Max HR", min_value=0, max_value=250, step=1)
-        with col5:
-            cadence = st.number_input("Cadence (spm)", min_value=0, max_value=300, step=1)
-        with col6:
-            elevation = st.number_input("Elevation Gain (ft)", min_value=0, step=1)
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        with col3:
+            avg_hr = st.number_input(
+                "Average HR",
+                min_value=0,
+                max_value=250,
+                step=1,
+            )
+
+        with col4:
+            max_hr = st.number_input(
+                "Max HR",
+                min_value=0,
+                max_value=250,
+                step=1,
+            )
+
+        with col5:
+            cadence = st.number_input(
+                "Cadence (spm)",
+                min_value=0,
+                max_value=300,
+                step=1,
+            )
+
+        with col6:
+            elevation = st.number_input(
+                "Elevation Gain (ft)",
+                min_value=0,
+                step=1,
+            )
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # ============================================
         # FEELING / EFFORT CARD
         # ============================================
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Effort & How You Felt")
+        st.subheader("🧠 Effort & How You Felt")
 
         col7, col8 = st.columns(2)
 
         with col7:
             effort = st.slider("Effort (1–10)", 1, 10, value=5)
-            sleep = st.text_input("Sleep (hours)", placeholder="e.g., 7.5")
+            sleep = st.text_input("Sleep (hours)", placeholder="e.g. 7.5")
             stress = st.slider("Stress (1–5)", 1, 5, value=3)
 
         with col8:
-            weather = st.text_input("Weather", placeholder="Cold & dry, windy, humid…")
-            terrain = st.text_input("Terrain", placeholder="Road / Trail / Track / Treadmill")
-            felt = st.text_area("How You Felt", placeholder="Describe how the run felt…")
+            weather = st.text_input(
+                "Weather",
+                placeholder="Cold & dry, windy, humid…",
+            )
+            terrain = st.text_input(
+                "Terrain",
+                placeholder="Road / Trail / Track / Treadmill",
+            )
+            felt = st.text_area(
+                "How You Felt",
+                placeholder="Describe how the run felt…",
+            )
+            pain = st.text_input(
+                "Any Pain or Tightness?",
+                placeholder="Shins, calves, knees, etc.",
+            )
+            hydration = st.text_input(
+                "Nutrition / Hydration",
+                placeholder="Fasted, electrolytes, gels…",
+            )
 
-        pain = st.text_input("Any Pain or Tightness?", placeholder="Shins, calves, knees, etc.")
-        hydration = st.text_input("Nutrition / Hydration", placeholder="Fasted, electrolytes, gels…")
-
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # ============================================
-        # GARMIN METRICS CARD
+        # GARMIN & EXTRA METRICS CARD
         # ============================================
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Garmin & Additional Metrics")
+        st.subheader("📊 Garmin & Additional Metrics")
 
         col9, col10 = st.columns(2)
 
         with col9:
-            vo2max = st.number_input("VO2 Max", min_value=0.0, step=0.1)
-            training_load = st.number_input("Training Load", min_value=0, step=1)
+            vo2max = st.number_input(
+                "VO2 Max",
+                min_value=0.0,
+                step=0.1,
+            )
+            training_load = st.number_input(
+                "Training Load",
+                min_value=0,
+                step=1,
+            )
+
         with col10:
-            hrv = st.number_input("HRV (7-day Avg)", min_value=0, step=1)
-            performance_condition = st.text_input("Performance Condition", placeholder="+2, -3, etc.")
+            hrv = st.number_input(
+                "HRV (7-day Avg)",
+                min_value=0,
+                step=1,
+            )
+            performance_condition = st.text_input(
+                "Performance Condition",
+                placeholder="+2, -3, etc.",
+            )
 
-        notes = st.text_area("Additional Notes", placeholder="Anything else to remember…")
+        notes = st.text_area(
+            "Additional Notes",
+            placeholder="Anything else to remember…",
+        )
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # ============================================
-        # SUBMIT BUTTON
+        # SUBMIT BUTTON (CENTERED)
         # ============================================
-        center = st.columns(3)[1]
-        with center:
-            submitted = st.form_submit_button("💾 Save Run")
+        st.markdown('<div class="card" style="text-align:center;">', unsafe_allow_html=True)
+        cols = st.columns(3)
+        with cols[1]:
+            submitted = st.form_submit_button("💾 Save Run", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         # =======================================================
         # VALIDATION BEFORE WRITING TO DB
         # =======================================================
         if submitted:
-
             # Duration validation
             if duration_seconds is None or duration_seconds <= 0:
                 st.error("❌ Please enter a valid duration like `5:43` or `1:02:15`.")
@@ -197,10 +260,10 @@ def render_log_run():
                 st.error("❌ Distance must be greater than 0 miles.")
                 st.stop()
 
-            # HR sanity check
+            # HR sanity hints
             if avg_hr and avg_hr < 40:
                 st.warning("⚠️ Average HR below 40 is unusual — double check?")
-            if max_hr and max_hr < avg_hr:
+            if max_hr and avg_hr and max_hr < avg_hr:
                 st.warning("⚠️ Max HR is lower than Avg HR — double check?")
 
             # Clean text fields
@@ -240,7 +303,7 @@ def render_log_run():
             }
 
             add_run(run_data)
-            st.success("Run saved successfully! ✅")
+            st.success("✅ Run saved successfully!")
 
 
 def main():
