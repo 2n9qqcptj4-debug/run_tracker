@@ -34,6 +34,7 @@ html, body, [class*="css"] {
     padding-top: calc(var(--header-height) + 25px) !important;
 }
 
+
 /* --------------------------------------------------------
    TOP GLOBAL HEADER (TrainingPeaks Style)
 --------------------------------------------------------- */
@@ -45,6 +46,7 @@ header[data-testid="stHeader"] {
     border-bottom: 1px solid var(--border-light);
 }
 
+/* Replace default text with our app title */
 header[data-testid="stHeader"]::after {
     content: "Run Tracker";
     display: flex;
@@ -55,10 +57,11 @@ header[data-testid="stHeader"]::after {
     padding-left: 24px;
 }
 
-/* Remove Streamlit's default header clutter */
+/* Hide Streamlit’s built-in content */
 header[data-testid="stHeader"] * {
     visibility: hidden;
 }
+
 
 /* --------------------------------------------------------
    SIDEBAR
@@ -70,27 +73,36 @@ section[data-testid="stSidebar"] {
     border-right: 1px solid var(--border-light);
 }
 
-section[data-testid="stSidebar"] .css-1d391kg, 
-section[data-testid="stSidebar"] .css-1n76uvr {
-    padding-top: 20px !important;
-}
-
 section[data-testid="stSidebar"] a {
     font-size: 15px !important;
     padding: 10px 6px !important;
     border-radius: 6px;
-    transition: background 0.2s ease;
+    transition: background 0.2s ease, padding-left 0.2s;
 }
 
+/* hover */
 section[data-testid="stSidebar"] a:hover {
     background: rgba(255,255,255,0.06);
+    padding-left: 10px !important;
 }
 
-/* Style selected tab */
+/* selected */
 section[data-testid="stSidebar"] .css-1lcbmhc {
     background: var(--primary);
     border-radius: 6px;
+    color: white !important;
 }
+
+/* Icon + label alignment */
+section[data-testid="stSidebar"] .stRadio > div {
+    gap: 6px !important;
+}
+
+section[data-testid="stSidebar"] .stRadio label {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+}
+
 
 /* --------------------------------------------------------
    CARDS
@@ -114,6 +126,7 @@ section[data-testid="stSidebar"] .css-1lcbmhc {
     color: var(--primary);
 }
 
+
 /* --------------------------------------------------------
    EXPANDERS
 --------------------------------------------------------- */
@@ -128,8 +141,9 @@ section[data-testid="stSidebar"] .css-1lcbmhc {
     padding: 15px 12px !important;
 }
 
+
 /* --------------------------------------------------------
-   BUTTONS (Better Analytics Feel)
+   BUTTONS (clean, bold training UI)
 --------------------------------------------------------- */
 
 .stButton>button {
@@ -148,6 +162,7 @@ section[data-testid="stSidebar"] .css-1lcbmhc {
     transform: translateY(-1px);
 }
 
+
 /* --------------------------------------------------------
    METRICS
 --------------------------------------------------------- */
@@ -161,6 +176,7 @@ section[data-testid="stSidebar"] .css-1lcbmhc {
     color: var(--text-light) !important;
     font-weight: 500 !important;
 }
+
 
 /* --------------------------------------------------------
    TABS
@@ -181,13 +197,15 @@ section[data-testid="stSidebar"] .css-1lcbmhc {
     color: white !important;
 }
 
+
 /* --------------------------------------------------------
    INPUTS
 --------------------------------------------------------- */
 
-input, textarea, select {
+input, textarea, select, .stTextInput>div>div>input {
     border-radius: 6px !important;
 }
+
 
 /* --------------------------------------------------------
    ANIMATIONS
