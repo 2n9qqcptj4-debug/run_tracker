@@ -1,4 +1,6 @@
 import streamlit as st
+from utils.styling import inject_css
+inject_css()
 from utils.database import add_run
 from datetime import datetime
 
@@ -227,3 +229,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
