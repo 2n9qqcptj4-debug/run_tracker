@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-from utils.database import fetch_runs, update_run
+from utils.database import fetch_runs, update_run, delete_run
+
 
 def render_edit_run_page():
     st.title("✏️ Edit Run")
@@ -11,7 +12,9 @@ def render_edit_run_page():
         st.warning("No runs found. Log a run first.")
         return
 
-    # Select run to edit
+    # --------------------------------------------------
+    # Select the run to edit
+    # --------------------------------------------------
     st.subheader("Choose a run to edit")
 
     df_sorted = df.sort_values("date", ascending=False)
@@ -23,34 +26,44 @@ def render_edit_run_page():
     selected_label = st.selectbox("Select a run:", list(run_options.keys()))
     selected_id = run_options[selected_label]
 
-    # Load run details
+    # Get selected run record
     run = df[df["id"] == selected_id].iloc[0]
 
+    # --------------------------------------------------
+    # Edit Fields
+    # --------------------------------------------------
     st.subheader("Edit Run Details")
 
     new_date = st.date_input("Date", pd.to_datetime(run["date"]))
+
     new_run_type = st.selectbox(
-        "Type",
+        "Run Type",
         ["Easy", "Tempo", "Interval", "Long", "Race", "Recovery"],
         index=["Easy", "Tempo", "Interval", "Long", "Race", "Recovery"].index(run["run_type"]),
     )
 
-    new_distance = st.number_input("Distance (miles)", min_value=0.0, value=float(run["distance"]), step=0.1)
+    new_distance = st.number_input(
+        "Distance (miles)", min_value=0.0, value=float(run["distance"]), step=0.1
+    )
 
     # Duration input
     new_duration = st.text_input(
         "Duration (HH:MM:SS)",
-        value=str(run["duration"]) if isinstance(run["duration"], str) else "00:00:00"
+        value=str(run["duration"]) if isinstance(run["duration"], str) else "00:00:00",
     )
 
     new_avg_hr = st.number_input(
-        "Avg HR (optional)", min_value=0, max_value=250,
-        value=int(run["avg_hr"]) if pd.notna(run["avg_hr"]) else 0
+        "Avg HR (optional)",
+        min_value=0,
+        max_value=250,
+        value=int(run["avg_hr"]) if pd.notna(run["avg_hr"]) else 0,
     )
 
     new_effort = st.slider("Effort (1–10)", 1, 10, int(run["effort"]))
 
-    # Save button
+    # --------------------------------------------------
+    # Save Changes Button
+    # --------------------------------------------------
     if st.button("💾 Save Changes"):
         update_run(
             run_id=selected_id,
@@ -63,6 +76,23 @@ def render_edit_run_page():
         )
         st.success("Run updated successfully!")
         st.experimental_rerun()
+
+    st.write("---")
+
+    # --------------------------------------------------
+    # DELETE RUN BUTTON
+    # --------------------------------------------------
+    st.subheader("❌ Delete This Run")
+
+    delete_confirm = st.checkbox("I understand that this cannot be undone", key="delete_confirm")
+
+    if st.button("🗑️ Delete Run"):
+        if delete_confirm:
+            delete_run(selected_id)
+            st.error("Run deleted.")
+            st.experimental_rerun()
+        else:
+            st.warning("Please check the confirmation box before deleting.")
 
 
 def main():
