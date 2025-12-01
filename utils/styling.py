@@ -1,77 +1,204 @@
 import streamlit as st
 
 def inject_css():
-    st.markdown("""
-    <style>
+    st.markdown(
+        """
+<style>
 
-    /* --------- GLOBAL FONT + SMOOTHING ---------- */
-    * {
-        font-family: 'Inter', sans-serif;
-        -webkit-font-smoothing: antialiased;
-    }
+:root {
+    --primary: #1B74D8;       /* TrainingPeaks Blue */
+    --primary-dark: #1259A8;
+    --accent-green: #2ecc71;
+    --accent-orange: #f39c12;
+    --card-bg: rgba(255, 255, 255, 0.06);
+    --border-light: rgba(255, 255, 255, 0.12);
+    --text-light: #E6E6E6;
+    --header-height: 64px;
+}
 
-    /* --------- CARD STYLE ---------- */
-    .card {
-        background: rgba(255, 255, 255, 0.05);
-        padding: 20px;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.08);
-        margin-bottom: 20px;
-        backdrop-filter: blur(6px);
-    }
+/* --------------------------------------------------------
+   GLOBAL FONT
+--------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-    /* --------- SECTION HEADERS ---------- */
-    .section-header {
-        background: linear-gradient(90deg, #4a90e2, #2d73b8);
-        padding: 8px 14px;
-        color: white !important;
-        font-weight: 600;
-        border-radius: 8px;
-        margin-bottom: 12px;
-        margin-top: 25px;
-    }
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+    color: var(--text-light);
+}
 
-    /* ------------ PREMIUM DESIGNER TABS -------------- */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px !important;
-        padding: 12px 0 !important;
-        justify-content: center !important;
-        border-bottom: 1px solid rgba(255,255,255,0.08) !important;
-    }
+/* --------------------------------------------------------
+   GLOBAL LAYOUT
+--------------------------------------------------------- */
 
-    .stTabs [data-baseweb="tab"] {
-        padding: 10px 24px !important;
-        border-radius: 12px !important;
-        background: rgba(255,255,255,0.05) !important;
-        font-weight: 600 !important;
-        transition: all 0.25s ease-in-out !important;
-        backdrop-filter: blur(6px) !important;
-        border: 1px solid rgba(255,255,255,0.08) !important;
-    }
+.main > div {
+    padding-top: calc(var(--header-height) + 25px) !important;
+}
 
-    .stTabs [data-baseweb="tab"]:hover {
-        background: rgba(255,255,255,0.15) !important;
-        transform: translateY(-2px) !important;
-        cursor: pointer !important;
-    }
+/* --------------------------------------------------------
+   TOP GLOBAL HEADER (TrainingPeaks Style)
+--------------------------------------------------------- */
 
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(90deg, #4a90e2, #2d73b8) !important;
-        color: white !important;
-        box-shadow: 0px 4px 15px rgba(0,0,0,0.25) !important;
-        border: none !important;
-        transform: translateY(0px) !important;
-    }
+header[data-testid="stHeader"] {
+    height: var(--header-height);
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-light);
+}
 
-    /* --------- TAB CONTENT FADE-IN ---------- */
-    .tab-content {
-        animation: fadeIn 0.4s ease-in-out;
-    }
+header[data-testid="stHeader"]::after {
+    content: "Run Tracker";
+    display: flex;
+    align-items: center;
+    font-size: 21px;
+    font-weight: 600;
+    color: white;
+    padding-left: 24px;
+}
 
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(6px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+/* Remove Streamlit's default header clutter */
+header[data-testid="stHeader"] * {
+    visibility: hidden;
+}
 
-    </style>
-    """, unsafe_allow_html=True)
+/* --------------------------------------------------------
+   SIDEBAR
+--------------------------------------------------------- */
+
+section[data-testid="stSidebar"] {
+    background-color: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(10px);
+    border-right: 1px solid var(--border-light);
+}
+
+section[data-testid="stSidebar"] .css-1d391kg, 
+section[data-testid="stSidebar"] .css-1n76uvr {
+    padding-top: 20px !important;
+}
+
+section[data-testid="stSidebar"] a {
+    font-size: 15px !important;
+    padding: 10px 6px !important;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+}
+
+section[data-testid="stSidebar"] a:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+/* Style selected tab */
+section[data-testid="stSidebar"] .css-1lcbmhc {
+    background: var(--primary);
+    border-radius: 6px;
+}
+
+/* --------------------------------------------------------
+   CARDS
+--------------------------------------------------------- */
+
+.card {
+    background: var(--card-bg);
+    padding: 22px 28px;
+    border-radius: 12px;
+    border: 1px solid var(--border-light);
+    margin-bottom: 22px;
+    box-shadow: 0px 3px 12px rgba(0,0,0,0.25);
+    animation: fadeIn 0.4s ease-out;
+}
+
+.section-header {
+    margin-top: 10px;
+    margin-bottom: 8px;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+/* --------------------------------------------------------
+   EXPANDERS
+--------------------------------------------------------- */
+
+.streamlit-expanderHeader {
+    font-size: 17px !important;
+    font-weight: 600 !important;
+}
+
+.streamlit-expanderContent {
+    background: rgba(255,255,255,0.02) !important;
+    padding: 15px 12px !important;
+}
+
+/* --------------------------------------------------------
+   BUTTONS (Better Analytics Feel)
+--------------------------------------------------------- */
+
+.stButton>button {
+    background-color: var(--primary) !important;
+    color: white !important;
+    padding: 10px 22px !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--primary-dark) !important;
+    font-weight: 600 !important;
+    transition: 0.2s ease-in-out;
+    font-size: 15px !important;
+}
+
+.stButton>button:hover {
+    background-color: var(--primary-dark) !important;
+    transform: translateY(-1px);
+}
+
+/* --------------------------------------------------------
+   METRICS
+--------------------------------------------------------- */
+
+[data-testid="stMetricValue"] {
+    color: var(--primary) !important;
+    font-size: 28px !important;
+}
+
+[data-testid="stMetricLabel"] {
+    color: var(--text-light) !important;
+    font-weight: 500 !important;
+}
+
+/* --------------------------------------------------------
+   TABS
+--------------------------------------------------------- */
+
+.stTabs [role="tab"] {
+    padding: 12px 16px;
+    border-radius: 6px 6px 0 0;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-light);
+    color: var(--text-light);
+    font-weight: 500;
+    margin-right: 4px;
+}
+
+.stTabs [aria-selected="true"] {
+    background: var(--primary) !important;
+    color: white !important;
+}
+
+/* --------------------------------------------------------
+   INPUTS
+--------------------------------------------------------- */
+
+input, textarea, select {
+    border-radius: 6px !important;
+}
+
+/* --------------------------------------------------------
+   ANIMATIONS
+--------------------------------------------------------- */
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
