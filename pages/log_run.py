@@ -1,9 +1,6 @@
 import streamlit as st
-from utils.styling import inject_css
-inject_css()
 from utils.database import add_run
 from datetime import datetime
-import pandas as pd
 
 
 # ---------------------------------------------------------
@@ -69,7 +66,7 @@ def render_log_run_page():
     st.markdown("</div>", unsafe_allow_html=True)
 
     # ======================================================
-    # CARD — PHYSIOLOGY METRICS
+    # CARD — HEART & BODY METRICS
     # ======================================================
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("❤️ Heart & Body Metrics")
@@ -83,17 +80,17 @@ def render_log_run_page():
         max_hr = st.number_input("Max HR", min_value=0, max_value=250, step=1)
 
     with col3:
-        hrv = st.number_input("HRV", min_value=0, max_value=250, step=1)
+        hrv = st.number_input("HRV", min_value=0, max_value=200, step=1)
 
     effort = st.slider("Effort (1–10)", 1, 10, 5)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
     # ======================================================
-    # CARD — MOVEMENT & PERFORMANCE
+    # CARD — RUNNING PERFORMANCE
     # ======================================================
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("📈 Running Performance Metrics")
+    st.subheader("📈 Performance Metrics")
 
     colA, colB, colC = st.columns(3)
 
@@ -104,7 +101,11 @@ def render_log_run_page():
         elevation = st.number_input("Elevation Gain (ft)", min_value=0, step=1)
 
     with colC:
-        power = st.number_input("Running Power (watts)", min_value=0, step=1)
+        training_load = st.number_input("Training Load (optional)", min_value=0, step=1)
+
+    vo2max = st.number_input("VO2 Max (optional)", min_value=0.0, step=0.1)
+
+    performance_condition = st.text_input("Performance Condition (optional)")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -117,38 +118,40 @@ def render_log_run_page():
     colX, colY = st.columns(2)
 
     with colX:
-        terrain = st.text_input("Terrain (e.g., Roads, Treadmill, Trail)")
+        terrain = st.text_input("Terrain (Road, Treadmill, Trail, etc.)")
 
     with colY:
-        weather = st.text_input("Weather (e.g., 65°F, windy)")
+        weather = st.text_input("Weather (65°F, windy, etc.)")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
     # ======================================================
-    # CARD — RECOVERY & WELLNESS
+    # CARD — WELLNESS / RECOVERY
     # ======================================================
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("😴 Wellness Factors")
+    st.subheader("😴 Wellness & Recovery")
 
     colS1, colS2 = st.columns(2)
 
     with colS1:
-        sleep_hours = st.number_input("Sleep (hours)", min_value=0.0, step=0.1)
+        sleep = st.text_input("Sleep (hours)", placeholder="7.5")
 
     with colS2:
-        stress = st.slider("Stress (1–5)", 1, 5, 3)
+        stress = st.text_input("Stress (1–5)")
 
-    nutrition = st.text_area("Nutrition / Hydration Notes (optional)")
+    hydration = st.text_area("Hydration Notes (optional)")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
     # ======================================================
-    # CARD — NOTES
+    # CARD — FEELINGS & NOTES
     # ======================================================
     st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.subheader("🧾 Additional Notes")
+    st.subheader("🧠 How You Felt")
 
-    notes = st.text_area("Notes about the run")
+    felt = st.text_input("How you felt (optional)")
+    pain = st.text_input("Any pain? (optional)")
+    notes = st.text_area("Notes (optional)")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -156,6 +159,7 @@ def render_log_run_page():
     # SAVE BUTTON
     # ======================================================
     if st.button("💾 Save Run", type="primary"):
+
         # ---- Duration Validation ----
         duration_seconds = parse_time_to_seconds(duration_input)
         if duration_seconds is None:
@@ -170,40 +174,48 @@ def render_log_run_page():
                 return
             avg_pace = pace_input.strip()
         else:
-            # Auto-calc
             if distance > 0:
                 pace_seconds = duration_seconds / distance
                 avg_pace = format_pace(int(pace_seconds))
             else:
                 avg_pace = None
 
-        # Format duration to DB standard
+        # ---- Format duration string ----
         if len(duration_input.split(":")) == 3:
             duration_str = f"0 days {duration_input}"
         else:
             duration_str = f"0 days 00:{duration_input}"
 
-        # Save the run
-        add_run(
-            str(date),
-            run_type,
-            distance,
-            duration_str,
-            avg_pace,
-            avg_hr,
-            effort,
-            notes,
-            terrain,
-            weather,
-            max_hr,
-            hrv,
-            cadence,
-            elevation,
-            power,
-            sleep_hours,
-            stress,
-            nutrition,
-        )
+        # -------------------------------------------------
+        # BUILD DATA DICT EXACTLY MATCHING YOUR TABLE
+        # -------------------------------------------------
+        run_data = {
+            "date": str(date),
+            "run_type": run_type,
+            "distance": distance,
+            "duration": duration_str,
+            "avg_pace": avg_pace,
+            "avg_hr": avg_hr,
+            "max_hr": max_hr,
+            "cadence": cadence,
+            "elevation": elevation,
+            "effort": effort,
+            "weather": weather,
+            "terrain": terrain,
+            "felt": felt,
+            "pain": pain,
+            "sleep": sleep,
+            "stress": stress,
+            "hydration": hydration,
+            "vo2max": vo2max,
+            "training_load": training_load,
+            "hrv": hrv,
+            "performance_condition": performance_condition,
+            "notes": notes,
+        }
+
+        # Save the full dict
+        add_run(run_data)
 
         st.success("✅ Run saved successfully!")
         st.rerun()
@@ -215,4 +227,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
