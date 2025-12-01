@@ -60,7 +60,6 @@ def render_dashboard_page():
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("🗓️ Recent Runs")
 
-    # Show the 10 most recent
     recent_df = df.sort_values("date", ascending=False).head(10)
 
     st.dataframe(
@@ -85,7 +84,6 @@ def render_dashboard_page():
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("📆 Weekly Mileage (Quick View)")
 
-    # group by ISO week
     metrics_dt["year_week"] = metrics_dt["date_dt"].dt.strftime("%Y-W%V")
     weekly = (
         metrics_dt.groupby("year_week", dropna=True)["distance"]
@@ -101,7 +99,7 @@ def render_dashboard_page():
     st.markdown("</div>", unsafe_allow_html=True)
 
     # -------------------------------------------------
-    # PR BOARD
+    # PR BOARD (PRETTIER)
     # -------------------------------------------------
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("🏅 PR Board")
@@ -109,7 +107,30 @@ def render_dashboard_page():
     if not prs:
         st.write("No PRs calculated yet. Keep running and they’ll show up here!")
     else:
-        st.json(prs)
+        # Turn whatever structure we have into a clean table
+        rows = []
+
+        if isinstance(prs, dict):
+            for key, val in prs.items():
+                # Simple scalar: "Longest": 3
+                if isinstance(val, (int, float, str)):
+                    rows.append({"PR / Metric": key, "Value": val})
+                # Nested dict: e.g. {"5K": {"time": "...", "pace": "..."}}
+                elif isinstance(val, dict):
+                    for subk, subv in val.items():
+                        rows.append(
+                            {"PR / Metric": f"{key} – {subk}", "Value": subv}
+                        )
+                # Anything else -> string
+                else:
+                    rows.append({"PR / Metric": key, "Value": str(val)})
+        else:
+            # Fallback – just show as string
+            rows.append({"PR / Metric": "All", "Value": str(prs)})
+
+        pr_df = pd.DataFrame(rows)
+
+        st.dataframe(pr_df, use_container_width=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
