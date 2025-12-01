@@ -1,90 +1,86 @@
 import streamlit as st
-from openai import OpenAI
-from openai import APIConnectionError, RateLimitError, APIError
+
+# Full diagnostic imports
+import sys
+import pkgutil
+import importlib
+import traceback
+
+# Try importing OpenAI
+try:
+    import openai
+except Exception as e:
+    st.error(f"❌ Failed to import openai: {e}")
+    openai = None
 
 
-# ------------------------------------------------------
-# GET CLIENT — Streamlit-safe, no proxies
-# ------------------------------------------------------
+def get_debug_info():
+    info = []
+
+    info.append("🔍 Python version: " + sys.version)
+    
+    if openai:
+        info.append(f"📦 openai module file: {getattr(openai, '__file__', 'NO FILE')}")
+        info.append(f"📦 openai version: {getattr(openai, '__version__', 'NO VERSION')}")
+
+        # Show what the module actually contains
+        attrs = dir(openai)
+        info.append("📦 openai attributes sample: " + ", ".join(attrs[:40]))
+
+    else:
+        info.append("⚠️ openai failed to import")
+
+    return "\n".join(info)
+
+
 def get_client():
-    # Check key existence
-    if "OPENAI_API_KEY" not in st.secrets:
-        st.error(
-            "❌ OPENAI_API_KEY missing in Streamlit Secrets.\n\n"
-            "Go to **Manage App → Secrets** and add:\n"
-            "```toml\nOPENAI_API_KEY=\"your_key_here\"\n```"
-        )
-        raise KeyError("Missing OPENAI_API_KEY")
-
-    key = st.secrets["OPENAI_API_KEY"]
-
-    # Check empty key
-    if not key or key.strip() == "":
-        st.error("❌ OPENAI_API_KEY is empty.")
-        raise ValueError("Empty OPENAI_API_KEY")
-
+    """
+    Creates OpenAI client and returns detailed diagnostic info when failing.
+    """
     try:
-        # Initialize official OpenAI client
-        client = OpenAI(api_key=key)
-        return client
-
+        from openai import OpenAI  # safe import
     except Exception as e:
-        st.error(f"❌ Failed to initialize OpenAI client:\n\n```\n{e}\n```")
-        raise
+        return None, f"❌ Could not import OpenAI class:\n{e}\n\nTraceback:\n{traceback.format_exc()}"
 
-
-# ------------------------------------------------------
-# CALL AI — Chat Completion Wrapper
-# ------------------------------------------------------
-def call_ai(prompt: str) -> str:
+    # Try to initialize the client
     try:
-        client = get_client()
+        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        return client, None
+    except Exception as e:
+        return None, f"""
+❌ Failed to initialize OpenAI client
+Error: {e}
 
-        response = client.chat.completions.create(
+📘 Debug Info:
+{get_debug_info()}
+
+Traceback:
+{traceback.format_exc()}
+"""
+
+
+def call_ai(prompt: str):
+    """
+    Sends prompt to OpenAI with full debug reporting.
+    """
+    client, err = get_client()
+    if err:
+        return err  # return debug info right to Streamlit
+
+    try:
+        resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1400,
-            temperature=0.8,
         )
-
-        return response.choices[0].message.content
-
-    except RateLimitError:
-        st.error("⚠️ OpenAI rate limit reached. Try again shortly.")
-        return "Rate limit reached."
-
-    except APIConnectionError:
-        st.error("🌐 Network issue connecting to OpenAI.")
-        return "Connection error."
-
-    except APIError as e:
-        st.error(f"🔥 OpenAI server error:\n\n```\n{e}\n```")
-        return "OpenAI server error."
-
+        return resp.choices[0].message.content
     except Exception as e:
-        st.error(f"🚨 Unexpected AI error:\n\n```\n{e}\n```")
-        return "Unexpected error."
+        return f"""
+🚨 Unexpected error contacting OpenAI:
+{e}
 
+📘 Debug Info:
+{get_debug_info()}
 
-# ------------------------------------------------------
-# OPTIONAL SYSTEM+USER Prompt Function
-# ------------------------------------------------------
-def call_ai_system(system_msg: str, user_msg: str) -> str:
-    try:
-        client = get_client()
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            temperature=0.7,
-            max_tokens=2000,
-        )
-
-        return response.choices[0].message.content
-
-    except Exception as e:
-        st.error(f"🚨 AI Error:\n\n```\n{e}\n```")
-        return "AI error."
+Traceback:
+{traceback.format_exc()}
+"""
